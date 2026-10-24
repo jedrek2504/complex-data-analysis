@@ -78,9 +78,9 @@ def describe(rep, rep_params, det, det_params):
 # ------------------------------------------------------------------ tables
 
 def table_configs(best):
-    lines = ["\\begin{longtable}{lllp{4.2cm}rrrrrrr}", "\\toprule",
-             "Zbiór & Repr. & Detektor & Konfiguracja & Prec. & Rec. & F1 & ROC-AUC & "
-             "PR-AUC & $t_{repr}$ [ms] & $t_{det}$ [ms] \\\\", "\\midrule", "\\endhead"]
+    lines = ["\\begin{longtable}{lllp{2.7cm}rrrrrrr}", "\\toprule",
+             "Zbiór & Repr. & Detektor & Konfiguracja & Prec. & Rec. & F1 & ROC & "
+             "PR-AUC & $t_{r}$ [ms] & $t_{d}$ [ms] \\\\", "\\midrule", "\\endhead"]
     for d in HIGHDIM_DATASETS:
         sub = best[best.dataset == d]
         top_pr = sub.test_pr_auc.max()
@@ -94,7 +94,9 @@ def table_configs(best):
                 pr = pm(r.test_pr_auc, r.test_pr_auc_sd)
                 if np.isclose(r.test_pr_auc, top_pr):
                     pr = f"\\textbf{{{pr}}}"
-                cells = [DISPLAY_NAMES[d] if first else "", REP_LABEL[rep], DET_LABEL[det],
+                short_rep = {"Original": "Oryg.", "AE": "AE"}.get(rep, rep)
+                short_det = {"Reconstruction": "Rekonstr."}.get(det, det)
+                cells = [DISPLAY_NAMES[d] if first else "", short_rep, short_det,
                          describe(rep, r.rep_params, det, r.det_params),
                          num(r.test_precision), num(r.test_recall), num(r.test_f1),
                          num(r.test_roc_auc), pr,

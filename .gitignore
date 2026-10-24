@@ -219,12 +219,8 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Local tooling
-CLAUDE.md
-.claude/
-
-# Downloaded datasets
-data/
+# Downloaded datasets (checksums in data/CHECKSUMS.txt are versioned)
+data/raw/
 
 # LaTeX build files
 *.aux

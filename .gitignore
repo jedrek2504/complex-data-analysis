@@ -225,3 +225,13 @@ CLAUDE.md
 
 # Downloaded datasets
 data/
+
+# LaTeX build files
+*.aux
+*.log
+*.toc
+*.out
+*.fls
+*.fdb_latexmk
+*.xdv
+*.synctex.gz

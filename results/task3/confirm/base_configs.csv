@@ -1,17 +1,17 @@
 dataset,base,rep,rep_params,detector,det_params,val_pr_auc_task2,test_pr_auc_task2
-breast_cancer,IForest,PCA,"{""n_components"": 1}",IForest,"{""n_estimators"": 200}",0.7059421082853188,0.7159648631946091
-breast_cancer,LOF,PCA,"{""n_components"": 1}",LOF,"{""n_neighbors"": 50}",0.8419617885816812,0.8349673828025537
-breast_cancer,OCSVM,PCA,"{""n_components"": 1}",OCSVM,"{""gamma_factor"": 1.0, ""kernel"": ""rbf"", ""nu"": 0.5}",0.8444716030023691,0.8396342439169648
-breast_cancer,PCA,PCA,"{""n_components"": 20}",Reconstruction,{},0.4040467242685254,0.4947596937135018
-ionosphere,IForest,PCA,"{""n_components"": 20}",IForest,"{""n_estimators"": 200}",0.9001199671787907,0.8893071988398074
-ionosphere,LOF,Original,{},LOF,"{""n_neighbors"": 20}",0.8660890709532014,0.8484779906114491
-ionosphere,OCSVM,Original,{},OCSVM,"{""gamma_factor"": 10.0, ""kernel"": ""rbf"", ""nu"": 0.05}",0.955886752136752,0.8999205399863293
-ionosphere,PCA,PCA,"{""n_components"": 8}",Reconstruction,{},0.9644246031746032,0.9261800787281428
-parkinsons,IForest,UMAP,"{""min_dist"": 0.5, ""n_components"": 10, ""n_neighbors"": 5}",IForest,"{""n_estimators"": 200}",0.3818230486119329,0.2441760629385402
-parkinsons,LOF,UMAP,"{""min_dist"": 0.0, ""n_components"": 5, ""n_neighbors"": 15}",LOF,"{""n_neighbors"": 50}",0.4975192101605259,0.2979089887036238
-parkinsons,OCSVM,UMAP,"{""min_dist"": 0.5, ""n_components"": 2, ""n_neighbors"": 15}",OCSVM,"{""gamma_factor"": 0.1, ""kernel"": ""rbf"", ""nu"": 0.5}",0.4706208773261667,0.3351080394841663
-parkinsons,PCA,PCA,"{""n_components"": 1}",Reconstruction,{},0.3158397448771052,0.2930428128636592
-synthetic,IForest,PCA,"{""n_components"": 20}",IForest,"{""n_estimators"": 200}",0.7491392560696557,0.7526091917175082
-synthetic,LOF,Original,{},LOF,"{""n_neighbors"": 35}",0.9505391577492258,0.929001580720089
-synthetic,OCSVM,Original,{},OCSVM,"{""gamma_factor"": 1.0, ""kernel"": ""rbf"", ""nu"": 0.05}",0.8267548500872302,0.8184109913262608
-synthetic,PCA,PCA,"{""n_components"": 5}",Reconstruction,{},0.7462718503127463,0.7379273072761762
+cardio,IForest,AE,"{""hidden"": [64, 32], ""latent_dim"": 16}",IForest,"{""n_estimators"": 200}",0.6190687135456905,0.5926833608968941
+cardio,LOF,PCA,"{""n_components"": 1}",LOF,"{""n_neighbors"": 50}",0.5374284434655268,0.5758636070606854
+cardio,OCSVM,UMAP,"{""min_dist"": 0.0, ""n_components"": 2, ""n_neighbors"": 50}",OCSVM,"{""gamma_factor"": 0.1, ""kernel"": ""rbf"", ""nu"": 0.5}",0.8476997573066786,0.8355739184811901
+cardio,PCA,PCA,"{""n_components"": 20}",Reconstruction,{},0.4798352005517887,0.4713535968358682
+arrhythmia,IForest,PCA,"{""n_components"": 8}",IForest,"{""n_estimators"": 200}",0.5300978094618628,0.5707931053870705
+arrhythmia,LOF,AE,"{""hidden"": [64, 32], ""latent_dim"": 4}",LOF,"{""n_neighbors"": 50}",0.545361093016848,0.5967441867703627
+arrhythmia,OCSVM,AE,"{""hidden"": [64, 32], ""latent_dim"": 4}",OCSVM,"{""gamma_factor"": 0.1, ""kernel"": ""rbf"", ""nu"": 0.5}",0.5343351404033433,0.5852199154738231
+arrhythmia,PCA,PCA,"{""n_components"": 1}",Reconstruction,{},0.3999378498904541,0.46249049174384
+wdbc,IForest,Original,{},IForest,"{""n_estimators"": 200}",0.7374470899470899,0.7535846560846561
+wdbc,LOF,PCA,"{""n_components"": 1}",LOF,"{""n_neighbors"": 35}",0.8708333333333333,0.9164814814814816
+wdbc,OCSVM,PCA,"{""n_components"": 1}",OCSVM,"{""gamma_factor"": 0.1, ""kernel"": ""rbf"", ""nu"": 0.5}",0.8708333333333333,0.9246296296296296
+wdbc,PCA,PCA,"{""n_components"": 20}",Reconstruction,{},0.4211604082130061,0.4585286478991329
+campaign,IForest,PCA,"{""n_components"": 3}",IForest,"{""n_estimators"": 200}",0.294846791948966,0.3025929829941861
+campaign,LOF,Original,{},LOF,"{""n_neighbors"": 35}",0.1964899004008697,0.2021065608549687
+campaign,OCSVM,Original,{},OCSVM,"{""gamma_factor"": 10.0, ""kernel"": ""rbf"", ""nu"": 0.1}",0.271039112466496,0.276067048619414
+campaign,PCA,PCA,"{""n_components"": 1}",Reconstruction,{},0.2589546518807487,0.2601374665213974

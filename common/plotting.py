@@ -18,8 +18,8 @@ METHOD_COLORS = {
     "Majority": "#6250d6",
     "Fusion": "#e34948",
 }
-TYPE_COLORS = {"global": "#2a78d6", "local": "#eb6834", "subspace": "#1baf7a"}
-TYPE_LABELS = {"global": "globalne", "local": "lokalne", "subspace": "podprzestrzenne"}
+TYPE_COLORS = {"global": "#2a78d6", "local": "#eb6834"}
+TYPE_LABELS = {"global": "globalne", "local": "lokalne"}
 NORMAL_COLOR = "#b4b2aa"
 ANOMALY_COLOR = "#e34948"
 TEXT = "#0b0b0b"

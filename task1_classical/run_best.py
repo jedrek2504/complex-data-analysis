@@ -4,12 +4,7 @@ For each dataset and method the configuration with the highest mean
 validation PR-AUC (over all seeds) is selected from results/task1/grid.csv.
 It is refitted for every seed; the decision threshold is the one maximising
 F1 on the validation part. Per-sample test scores and decisions are stored
-for the agreement and local/global analyses.
-
-Anomalies of the real datasets are labelled as *global* when their robust
-Mahalanobis distance to the normal class exceeds that of 99 % of the normal
-observations, and *local* otherwise (they lie inside the global envelope of
-the normal data and can only be told apart by their neighbourhood).
+for the agreement and local/global analyses (see common/anomaly_types.py).
 
 Outputs (results/task1/): best_configs.csv, best_metrics.csv,
 test_predictions.csv.gz
@@ -18,11 +13,10 @@ test_predictions.csv.gz
 import json
 import time
 
-import numpy as np
 import pandas as pd
-from sklearn.covariance import MinCovDet
 
-from common.datasets import TASK1_DATASETS, load_dataset
+from common.anomaly_types import anomaly_kind
+from common.datasets import TASK1_DATASETS
 from common.detectors import build
 from common.metrics import best_f1_threshold, evaluate
 from common.protocol import SEEDS, make_experiment
@@ -37,20 +31,6 @@ def select_configs(grid):
             .mean().reset_index())
     best = mean.loc[mean.groupby(["dataset", "method"])["val_pr_auc"].idxmax()]
     return best.reset_index(drop=True)
-
-
-def anomaly_kind(name, seed):
-    """'global' / 'local' label for every anomaly of a real dataset."""
-    data = load_dataset(name, seed)
-    if data.anomaly_type is not None:
-        return data.anomaly_type
-    X = (data.X - data.X.mean(0)) / data.X.std(0)
-    normal = X[data.y == 0]
-    mcd = MinCovDet(random_state=0, support_fraction=0.9).fit(normal)
-    dist = mcd.mahalanobis(X)
-    cutoff = np.quantile(dist[data.y == 0], 0.99)
-    kind = np.where(dist > cutoff, "global", "local")
-    return np.where(data.y == 1, kind, "normal")
 
 
 def main():

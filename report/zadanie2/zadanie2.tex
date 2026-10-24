@@ -1,0 +1,614 @@
+\documentclass[11pt,a4paper]{article}
+\newcommand{\resultsdir}{../../results/task2}
+\input{../common/preamble}
+
+\begin{document}
+\maketitlepage{Zadanie 2}{Detekcja wyjątków w danych wielowymiarowych:\\wpływ reprezentacji danych}
+\tableofcontents
+\newpage
+
+\section{Cel i zakres}
+
+Celem zadania jest zbadanie, jak sposób reprezentacji danych wielowymiarowych
+wpływa na skuteczność detekcji wyjątków. Porównano cztery reprezentacje:
+dane oryginalne (A), PCA (B), UMAP (C) i przestrzeń latentną autoenkodera (D).
+W każdej z nich uruchomiono te same trzy detektory -- Isolation Forest, LOF
+i One-Class SVM. Dla PCA i autoenkodera oceniono dodatkowo błąd
+rekonstrukcji jako samodzielny wynik anomalii. Daje to 12 konfiguracji
+podstawowych i 2 dodatkowe na każdy zbiór, łącznie 56 porównywanych
+konfiguracji na czterech zbiorach. Dla każdej reprezentacji systematycznie
+zbadano jej parametry (liczbę składowych PCA, \code{n\_neighbors},
+\code{min\_dist} i wymiar UMAP, wymiar latentny i architekturę
+autoenkodera), co dało 33 warianty reprezentacji $\times$ 15 konfiguracji
+detektorów $\times$ 4 zbiory $\times$ 10 podziałów, czyli ok. 20 tys.
+przebiegów detekcji.
+
+Kod znajduje się w katalogu \code{task2\_representations/}, a wspólne
+elementy (dane, podziały, detektory, metryki) w \code{common/}, tak jak
+w zadaniu~1.
+
+\section{Dane i protokół}
+
+Zadanie wymaga zbiorów o co najmniej 20--30 cechach, dlatego wykorzystano
+cztery zbiory z zadania~1 spełniające ten warunek: Breast Cancer (30 cech),
+Ionosphere (33), Parkinsons (22) oraz 30-wymiarowy zbiór syntetyczny.
+Glass (9 cech) pominięto. Definicja anomalii, podpróbkowanie do 10\,\%
+i charakterystyka zbiorów są takie same jak w zadaniu~1 (tabela~1 raportu
+z zadania~1). Przypomnijmy, że w zbiorze syntetycznym dane normalne leżą
+na 4-wymiarowej podprzestrzeni liniowej, a anomalie są trzech typów:
+globalne, lokalne (przy gęstym skupisku) i podprzestrzenne (przesunięte
+poza podprzestrzeń danych). Pozwala to wskazać, jaka informacja ginie
+przy redukcji wymiaru.
+
+Protokół jest identyczny jak w zadaniu~1 i we wszystkich porównaniach
+taki sam:
+\begin{enumerate}
+  \item te same 10 warstwowych podziałów 50/25/25\,\% (train/walidacja/test),
+  \item standaryzacja dopasowana na części uczącej,
+  \item \textbf{reprezentacja dopasowywana wyłącznie na części uczącej, bez
+  etykiet} (PCA, UMAP, autoenkoder), a następnie stosowana do części
+  walidacyjnej i testowej (\code{transform}),
+  \item detektory uczone w przestrzeni reprezentacji na części uczącej,
+  \item parametry reprezentacji i detektora wybierane łącznie na podstawie
+  średniej PR-AUC na walidacji, a próg -- przez maksymalizację F1 na
+  walidacji; część testowa służy tylko do oceny.
+\end{enumerate}
+
+Po transformacji każda reprezentacja jest centrowana i dzielona przez
+\emph{jeden wspólny} współczynnik (pierwiastek średniej wariancji
+współrzędnych na części uczącej). Zachowuje to geometrię przestrzeni
+(proporcje odległości), ale sprowadza wszystkie reprezentacje do
+porównywalnej skali, dzięki czemu np. $\gamma=1/d$ w OCSVM oznacza to samo
+w każdej przestrzeni. Celowo nie stosowano wybielania (\emph{whitening})
+składowych PCA, które zmieniłoby geometrię i wzmocniło składowe
+o znikomej wariancji.
+
+\paragraph{Detektory i ich siatki.} Isolation Forest z $T=200$ drzewami
+(w zadaniu~1 liczba drzew nie miała wpływu), LOF z
+$k\in\{5,10,20,35,50\}$, OCSVM z jądrem RBF (najlepszym w zadaniu~1),
+$\nu\in\{0{,}05;\,0{,}1;\,0{,}5\}$ i $\gamma\in\{0{,}1/d,\,1/d,\,10/d\}$,
+gdzie $d$ to wymiar reprezentacji. Hiperparametry detektora są wybierane
+osobno dla każdej reprezentacji, bo optymalne $k$ czy $\gamma$ zależą od
+geometrii przestrzeni. W przeciwnym razie porównanie faworyzowałoby
+reprezentację, do której dopasowano parametry.
+
+\paragraph{Miary jakości reprezentacji.} Oprócz metryk detekcji (Precision,
+Recall, F1, ROC-AUC, PR-AUC) dla każdej reprezentacji policzono na części
+testowej: \emph{trustworthiness} ($k=10$) -- w jakim stopniu sąsiedztwa
+w przestrzeni zredukowanej istnieją także w oryginalnej (1 = brak
+,,fałszywych sąsiadów''), oraz \emph{silhouette} podziału normalne/anomalie
+-- liczbową miarę widocznej separacji klas (od $-1$ do 1). Etykiety są tu
+użyte wyłącznie do analizy, nie do budowy reprezentacji. Mierzono czas
+dopasowania i transformacji reprezentacji oraz czas uczenia i oceny
+detektora.
+
+\section{Reprezentacje}
+
+\paragraph{A. Dane oryginalne.} Standaryzowane cechy ($d$ = 22--33).
+
+\paragraph{B. PCA.} Rzut na $k\in\{1,2,3,5,8,10,15,20\}$ pierwszych
+składowych głównych. Zachowana wariancja dla $k=5$ wynosi 0,81--0,91, dla
+$k=10$ -- 0,94--0,98 (rys.~\ref{fig:pca}, dolny wiersz). PCA zachowuje
+kierunki największej wariancji i odrzuca resztę, a anomalia odchylająca się
+w kierunkach o małej wariancji staje się niewidoczna w rzucie. Ta sama
+informacja jest jednak zawarta w \emph{błędzie rekonstrukcji}
+$\|x-\hat x\|^2$ (odległość od podprzestrzeni), który oceniano jako
+dodatkowy detektor.
+
+\paragraph{C. UMAP.} Nieliniowe zanurzenie zachowujące lokalną strukturę
+grafu $k$ najbliższych sąsiadów. Badano wymiar $m\in\{2,5,10\}$,
+\code{n\_neighbors} $\in\{5,15,50\}$ (skala struktury: lokalna -- globalna)
+oraz \code{min\_dist} $\in\{0{,}0;\,0{,}5\}$ (jak ciasno upakowane mogą
+być punkty), łącznie 18 wariantów. Nowe punkty są rzutowane metodą
+\code{transform}.
+
+\paragraph{D. Autoenkoder.} W pełni połączona sieć o architekturze lejka
+$d \to 64 \to 32 \to z \to 32 \to 64 \to d$ z aktywacją ReLU i liniowym
+wyjściem. Uzasadnienie wyborów:
+\begin{itemize}
+  \item \emph{Niedopełniona} warstwa $z < d$ wymusza kompresję. Sieć nie
+  może nauczyć się identyczności, więc musi odtwarzać dane z ich głównej
+  struktury, a obserwacje do niej niepasujące mają duży błąd rekonstrukcji.
+  \item Dwie warstwy ukryte pozwalają uchwycić zależności nieliniowe, czego
+  PCA nie potrafi. Przy 80--500 obserwacjach uczących głębsza sieć łatwo się
+  przeucza, dlatego zastosowano regularyzację: dropout 0,1 w koderze,
+  \emph{weight decay} $10^{-5}$ i wczesne zatrzymanie (patience 30 epok,
+  maks. 400) na podstawie błędu na 15\,\% części uczącej odłożonych do
+  monitorowania. Walidacja i test nie są używane do uczenia.
+  \item Funkcja straty MSE odpowiada standaryzowanym, ciągłym cechom,
+  optymalizator Adam ($\eta=10^{-3}$, batch 32).
+  \item Wymiar latentny $z\in\{2,4,8,16\}$ zbadano systematycznie. Wybór
+  architektury sprawdzono porównaniem z wariantem płytszym
+  ($d\to32\to8$) i szerszym ($d\to128\to64\to8$) -- tabela~\ref{tab:arch}.
+\end{itemize}
+Reprezentacją latentną jest wyjście kodera $z$, a wynikiem anomalii --
+średni kwadratowy błąd rekonstrukcji. Sieć uczy się na danych zawierających
+anomalie (scenariusz nienadzorowany), co ma znaczenie dla interpretacji
+wyników (sekcja~\ref{sec:ae}). Autoenkoder zaimplementowano w PyTorch.
+Na danych tej wielkości trening na CPU okazał się szybszy niż na GPU
+(RTX 3060 Laptop: ok. 0,01~s na epokę wobec ok. 0,02~s, bo dominuje
+narzut przesyłania małych porcji danych), dlatego obliczenia wykonywano
+równolegle na CPU.
+
+\section{Wyniki}
+
+\subsection{Zestawienie wszystkich konfiguracji}
+
+Rysunek~\ref{fig:matrix} przedstawia PR-AUC na części testowej dla
+wszystkich par reprezentacja--detektor, a tabela~\ref{tab:full} --
+pełne wyniki wszystkich 56 konfiguracji (parametry wybrane na walidacji).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{\fig{pr_auc_matrix}}
+  \caption{PR-AUC (część testowa, średnia z 10 podziałów) dla każdej pary
+  reprezentacja--detektor; ,,Rekonstrukcja'' -- błąd rekonstrukcji PCA lub
+  autoenkodera (n/d -- nie dotyczy). Parametry reprezentacji i detektora
+  wybrano na walidacji.}
+  \label{fig:matrix}
+\end{figure}
+
+Najważniejsze obserwacje:
+\begin{itemize}
+  \item \textbf{PCA jest jedyną reprezentacją, która często poprawia wyniki
+  detektorów.} Na Breast Cancer LOF rośnie z 0,67 do 0,84, a OCSVM z 0,67 do
+  0,84. Na Ionosphere Isolation Forest rośnie z 0,71 do 0,89, a na zbiorze
+  syntetycznym z 0,63 do 0,75.
+  \item \textbf{Błąd rekonstrukcji jest najlepszym detektorem na
+  Ionosphere} (PCA 0,926, autoenkoder 0,924 wobec 0,900 dla najlepszego
+  detektora w danych oryginalnych), ale słabym na Breast Cancer (0,45--0,50).
+  \item \textbf{UMAP pogarsza wyniki w 9 z 12 par zbiór--detektor},
+  często drastycznie (syntetyczny: LOF 0,93
+  $\to$ 0,40, Ionosphere: IForest 0,71 $\to$ 0,14).
+  \item \textbf{Przestrzeń latentna autoenkodera} daje wyniki pośrednie:
+  zwykle gorsze niż dane oryginalne lub PCA (wyjątek: Breast Cancer, LOF
+  0,71).
+  \item Na Parkinsons żadna reprezentacja nie zmienia obrazu (PR-AUC
+  0,18--0,37) -- jak pokazało zadanie~1, anomalie tego zbioru nie są
+  wyjątkami statystycznymi i zmiana reprezentacji tego nie naprawi.
+\end{itemize}
+
+\captionof{table}{Wszystkie konfiguracje (część testowa, średnie z 10
+podziałów, $\pm$ odchylenie std. dla PR-AUC). Konfiguracja -- parametry
+wybrane na walidacji: $k$ -- liczba składowych PCA; $m$, nn, md -- wymiar,
+\code{n\_neighbors} i \code{min\_dist} UMAP; $z$ -- wymiar latentny AE;
+$k_{LOF}$ -- liczba sąsiadów LOF; Oryg. -- dane oryginalne; AE -- autoenkoder. $t_{r}$ -- dopasowanie
+i transformacja reprezentacji, $t_{d}$ -- uczenie i ocena detektora. Pogrubienie --
+najlepsza PR-AUC na zbiorze.}
+\label{tab:full}
+{\footnotesize
+\setlength{\tabcolsep}{2.2pt}
+\tab{configs_full}
+}
+
+\subsection{PCA: liczba składowych, zachowana wariancja i jakość detekcji}
+
+Rysunek~\ref{fig:pca} pokazuje PR-AUC w funkcji liczby składowych $k$
+(parametry detektora wybierane na walidacji osobno dla każdego $k$) oraz
+zachowaną wariancję. Linie kropkowane to wyniki w danych oryginalnych.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{\fig{pca_components}}
+  \caption{PCA: PR-AUC (test) w zależności od liczby składowych (górny
+  wiersz; linie kropkowane -- ten sam detektor w danych oryginalnych) oraz
+  zachowana wariancja (dolny wiersz; linia przerywana -- 90\,\%).}
+  \label{fig:pca}
+\end{figure}
+
+Zależność między zachowaną wariancją a jakością detekcji \emph{nie jest
+monotoniczna} i różni się między zbiorami:
+\begin{itemize}
+  \item \textbf{Breast Cancer:} najlepsza jest jedna składowa ($k=1$, 39\,\%
+  wariancji): LOF 0,84, OCSVM 0,84, IForest 0,72. Pierwsza składowa
+  odpowiada ogólnej ,,wielkości'' jądra komórkowego (promień, obwód, pole są
+  skorelowane niemal w 100\,\%), czyli właśnie temu, czym guzy złośliwe
+  różnią się od łagodnych. Kolejne składowe dodają głównie zmienność wewnątrz
+  klasy normalnej i szum, który rozmywa sąsiedztwa.
+  \item \textbf{Ionosphere:} detektory wymagają dużego $k$ (IForest przy
+  $k\le 3$: 0,18--0,29), ale błąd rekonstrukcji już przy $k=3$ osiąga
+  ok. 0,9 -- anomalie leżą \emph{poza} podprzestrzenią głównych składowych.
+  \item \textbf{Zbiór syntetyczny:} LOF osiąga wynik danych oryginalnych
+  (0,93) dopiero przy $k=20$ (99\,\% wariancji), mimo że już $k=5$ zachowuje
+  91\,\% wariancji.
+\end{itemize}
+
+Tabela~\ref{tab:pca_types} wyjaśnia ten ostatni przypadek, który jest
+modelowym przykładem \textbf{utraty informacji przy redukcji wymiaru}.
+Anomalie podprzestrzenne różnią się od danych normalnych wyłącznie
+w kierunkach o znikomej wariancji. Przy $k\le5$ rzut PCA usuwa dokładnie
+te kierunki i Recall anomalii podprzestrzennych dla LOF spada z 0,91 do
+0,01 -- mimo że ,,zachowano'' 91\,\% wariancji. Kryterium zachowanej
+wariancji mierzy wierność odtworzenia \emph{typowych} danych, a nie
+informację potrzebną do wykrycia \emph{nietypowych}. Ta sama informacja
+nie ginie jednak, jeśli użyć błędu rekonstrukcji: przy $k=5$ wykrywa on
+100\,\% anomalii podprzestrzennych. Jednocześnie redukcja do $k=5$
+\emph{poprawia} wykrywanie anomalii lokalnych przez LOF (0,66 $\to$ 0,84),
+bo usuwa 25 wymiarów szumu, które rozmywały różnice lokalnej gęstości.
+Redukcja wymiaru jest więc zawsze wymianą: usuwa szum, ale razem z nim
+informację o odchyleniach w kierunkach o małej wariancji.
+
+\begin{table}[H]
+  \centering\small
+  \caption{Zbiór syntetyczny: Recall według typu anomalii i PR-AUC
+  w zależności od liczby składowych PCA (część testowa, 10 podziałów).
+  ,,Rekonstrukcja'' -- błąd rekonstrukcji PCA.}
+  \label{tab:pca_types}
+  \tab{pca_types_synthetic}
+\end{table}
+
+Ciekawym efektem jest poprawa Isolation Forest po PCA (syntetyczny
+0,63 $\to$ 0,75, Ionosphere 0,71 $\to$ 0,89). PCA przy $k=20$ niemal nie
+redukuje informacji, ale \emph{obraca} układ współrzędnych do osi
+głównych. Isolation Forest wykonuje cięcia równoległe do osi. W danych
+oryginalnych odchylenie anomalii podprzestrzennej rozkłada się na wszystkie
+30 cech i w każdej z nich ginie wśród dużej zmienności wzdłuż
+podprzestrzeni. Po obrocie trafia ono w składowe o małej wariancji, gdzie
+pojedyncze cięcie łatwo je izoluje (Recall podprzestrzennych 0,22 $\to$
+0,99). Dla LOF i OCSVM, które opierają się na odległościach euklidesowych
+niezmienniczych względem obrotu, ten efekt nie występuje.
+
+\subsection{UMAP: wpływ parametrów i struktura przestrzeni}
+
+Rysunek~\ref{fig:umap} przedstawia PR-AUC dla wszystkich 18 wariantów UMAP,
+a rys.~\ref{fig:umap_struct} -- jakość zachowania sąsiedztw
+(trustworthiness) i separację klas (silhouette).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{\fig{umap_params}}
+  \caption{UMAP: PR-AUC (test) w zależności od wymiaru $m$,
+  \code{n\_neighbors} i \code{min\_dist} dla trzech detektorów
+  (parametry detektora wybrane na walidacji).}
+  \label{fig:umap}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{\fig{umap_structure}}
+  \caption{UMAP: trustworthiness (górny wiersz) i silhouette podziału
+  normalne/anomalie (dolny wiersz, linia kropkowana -- dane oryginalne)
+  w funkcji \code{n\_neighbors}; linie ciągłe -- \code{min\_dist}=0,
+  przerywane -- 0,5; odcień -- wymiar $m$.}
+  \label{fig:umap_struct}
+\end{figure}
+
+\begin{itemize}
+  \item \textbf{Wymiar $m$:} większy wymiar zwykle pomaga (Breast Cancer,
+  LOF: najlepiej 0,53 dla $m=2$ wobec 0,67 dla $m=10$) i zwiększa
+  trustworthiness. Wymiar 2 jest dobry do wizualizacji, ale za mały do
+  detekcji.
+  \item \textbf{\code{n\_neighbors}:} większe wartości podnoszą
+  trustworthiness (UMAP uwzględnia szerszy kontekst) i zwykle PR-AUC LOF
+  i OCSVM (Ionosphere, LOF: 0,18--0,29 dla nn=5 wobec 0,30--0,57 dla
+  nn=50), bo przy małym \code{n\_neighbors} graf rozpada się na drobne,
+  lokalne składowe. Silhouette maleje jednak ze wzrostem
+  \code{n\_neighbors} (Breast Cancer: 0,40 $\to$ 0,17--0,24).
+  \item \textbf{\code{min\_dist}:} \code{min\_dist}=0 upakowuje punkty
+  ciasno w skupiska i daje ładniejsze wizualnie klastry, ale nie poprawia
+  detekcji; \code{min\_dist}=0,5 zachowuje więcej informacji o rozproszeniu
+  (wyższe PR-AUC LOF na Ionosphere: 0,57 wobec 0,36 przy nn=50, $m=10$).
+\end{itemize}
+
+\paragraph{Dlaczego UMAP szkodzi detekcji?} UMAP z konstrukcji
+\emph{normalizuje lokalną gęstość}: odległości do sąsiadów każdego punktu
+są skalowane względem odległości do jego najbliższego sąsiada ($\rho_i$,
+$\sigma_i$), aby każdy punkt miał ,,tyle samo'' połączeń. Punkt odosobniony
+zostaje przez to sztucznie ,,dociągnięty'' do najbliższego skupiska,
+a mała grupa anomalii staje się zwartym, gęstym klastrem (rys.~\ref{fig:emb},
+Ionosphere i Breast Cancer). Detektory gęstościowe (LOF) i izolacyjne
+(IForest) widzą wtedy anomalie jako normalne skupisko. Dodatkowo
+\code{transform} dla nowych punktów umieszcza je w pobliżu ich sąsiadów
+z części uczącej, co dodatkowo ,,wciąga'' anomalie do skupisk. Informacja
+o \emph{skali} odchylenia, kluczowa dla wyjątków globalnych, jest tracona:
+Recall anomalii globalnych zbioru syntetycznego spada z 1,00 do 0,40--0,53
+(tabela~\ref{tab:types}). UMAP jest narzędziem do wizualizacji struktury
+klastrowej, a nie reprezentacją zachowującą informację o odstawaniu.
+
+\subsection{Autoenkoder: wymiar latentny i architektura}
+\label{sec:ae}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{\fig{ae_latent}}
+  \caption{Autoenkoder: PR-AUC (test) detektorów w przestrzeni latentnej
+  i błędu rekonstrukcji w zależności od wymiaru latentnego.}
+  \label{fig:ae_latent}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{\fig{ae_training}}
+  \caption{Krzywe uczenia autoenkodera ($z=8$, podział 0): błąd na części
+  uczącej i na 15\,\% odłożonych do wczesnego zatrzymania.}
+  \label{fig:ae_train}
+\end{figure}
+
+Wpływ wymiaru latentnego (rys.~\ref{fig:ae_latent}) jest umiarkowany
+i zależy od zbioru. Na zbiorze syntetycznym błąd rekonstrukcji poprawia się
+od $z=2$ (0,67) do $z\ge 4$ (0,78--0,80), czyli gdy wymiar latentny
+osiąga prawdziwy wymiar podprzestrzeni danych (4). Mniejsze $z$ nie
+pozwala odtworzyć nawet danych normalnych, a większe nie szkodzi dzięki
+regularyzacji. Na Ionosphere błąd rekonstrukcji jest wysoki (0,89--0,92)
+dla każdego $z$. Detektory w przestrzeni latentnej są zwykle słabsze niż
+w danych oryginalnych, bo koder jest uczony do rekonstrukcji, a nie do
+zachowania odległości. Przestrzeń latentna nie ma więc dobrze określonej
+metryki i sąsiedztwa mogą być w niej dowolnie zniekształcone.
+
+Krzywe uczenia (rys.~\ref{fig:ae_train}) pokazują, że wczesne zatrzymanie
+działa: błąd na danych odłożonych przestaje maleć po 100--290 epokach,
+a różnica między błędem uczącym i odłożonym pozostaje niewielka.
+Porównanie architektur (tabela~\ref{tab:arch}) pokazuje, że wybór
+architektury ma znacznie mniejszy wpływ niż wybór zbioru i sposobu użycia
+autoenkodera. Różnice PR-AUC błędu rekonstrukcji między wariantami nie
+przekraczają 0,055 i mieszczą się w rozrzucie między podziałami.
+Architektura $d$-64-32-$z$ jest rozsądnym kompromisem: daje najlepszy błąd
+rekonstrukcji na dwóch zbiorach i umiarkowany czas uczenia.
+
+\begin{table}[H]
+  \centering\small
+  \caption{Porównanie architektur autoenkodera przy $z=8$ (część testowa,
+  10 podziałów): PR-AUC błędu rekonstrukcji, PR-AUC najlepszego (wg
+  walidacji) detektora w przestrzeni latentnej, średnia liczba epok do
+  wczesnego zatrzymania i czas uczenia.}
+  \label{tab:arch}
+  \tab{ae_architecture}
+\end{table}
+
+Ważnym ograniczeniem jest uczenie autoenkodera na danych zanieczyszczonych
+anomaliami. Na Breast Cancer guzy złośliwe tworzą spójne skupisko (ok.
+20 obserwacji w części uczącej), które sieć nauczyła się odtwarzać. Błąd
+rekonstrukcji anomalii nie jest wtedy większy niż obserwacji normalnych
+(PR-AUC 0,45). Na Ionosphere anomalie są rozproszone i ,,niepodobne do
+siebie'', więc sieć nie jest w stanie ich zapamiętać i błąd rekonstrukcji
+działa bardzo dobrze. Rekonstrukcja wykrywa więc anomalie
+\emph{niepowtarzalne}, a nie skupione.
+
+\subsection{Wizualizacje 2D i separacja a jakość detekcji}
+
+Rysunek~\ref{fig:emb} przedstawia dwuwymiarowe reprezentacje części
+testowej, a rys.~\ref{fig:sep} -- zależność między separacją klas
+(silhouette) a PR-AUC najlepszego detektora dla wszystkich wariantów
+reprezentacji.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{\fig{embeddings_2d}}
+  \caption{Dwuwymiarowe reprezentacje części testowej (podział 0): PCA
+  ($k=2$), UMAP ($m=2$, \code{n\_neighbors}=15, \code{min\_dist}=0)
+  i przestrzeń latentna autoenkodera ($z=2$).}
+  \label{fig:emb}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{\fig{separation_vs_detection}}
+  \caption{Separacja klas w reprezentacji (silhouette, część testowa) a
+  PR-AUC najlepszego detektora (wg walidacji) dla wszystkich wariantów
+  reprezentacji; $r$ -- współczynnik korelacji Pearsona.}
+  \label{fig:sep}
+\end{figure}
+
+Wizualizacje 2D mogą być mylące. UMAP daje najbardziej ,,czytelne''
+obrazy: w Ionosphere i Breast Cancer anomalie tworzą wyraźnie oddzielone,
+zwarte skupisko, a w zbiorze syntetycznym trzy klastry są idealnie
+rozdzielone. Te same reprezentacje dają jednak najgorszą detekcję. Gdy
+anomalie tworzą własny gęsty klaster, nie są już \emph{wyjątkami}
+w sensie żadnego detektora nienadzorowanego, który nie zna etykiet.
+Widoczna na wykresie ,,separacja'' wymaga wiedzy, które punkty są
+anomaliami, a detektor jej nie ma. W zbiorze syntetycznym UMAP wciąga
+anomalie lokalne i podprzestrzenne do skupisk i obraz 2D w ogóle ich nie
+pokazuje. Rzut PCA na 2 składowe także je ukrywa, choć z innego powodu
+(utrata składowych o małej wariancji).
+
+Liczbowa miara separacji (silhouette) koreluje z jakością detekcji silnie
+na zbiorze syntetycznym ($r=0{,}98$) i Ionosphere ($r=0{,}91$),
+umiarkowanie na Breast Cancer ($r=0{,}74$) i wcale na Parkinsons ($r=0{,}05$).
+Silhouette liczona w pełnej reprezentacji jest więc dużo lepszym
+wskaźnikiem niż wrażenie wizualne z rzutu 2D. Także ona mierzy jednak
+rozdzielenie \emph{grup}, a nie odstawanie pojedynczych punktów -- stąd
+rozbieżności na Breast Cancer, gdzie anomalie tworzą skupisko.
+
+\subsection{Typy anomalii w reprezentacjach}
+
+\begin{table}[H]
+  \centering\small
+  \caption{Zbiór syntetyczny: Recall według typu anomalii dla konfiguracji
+  wybranych na walidacji (część testowa, 10 podziałów).}
+  \label{tab:types}
+  \tab{recall_by_type_synthetic}
+\end{table}
+
+Tabela~\ref{tab:types} pokazuje, która reprezentacja zachowuje jaki rodzaj
+informacji. Anomalie globalne są wykrywane w każdej reprezentacji poza UMAP.
+Anomalie lokalne wykrywa przede wszystkim LOF, najlepiej w przestrzeni
+latentnej autoenkodera (0,82) -- autoenkoder usuwa szum spoza
+podprzestrzeni, co wyostrza różnice gęstości przy gęstym skupisku.
+Anomalie podprzestrzenne wykrywają błąd rekonstrukcji PCA (1,00)
+i autoenkodera (0,95), Isolation Forest po obrocie PCA (0,99) oraz LOF
+w danych oryginalnych (0,91), ale już nie LOF w przestrzeni latentnej
+(0,03), bo koder rzutuje je na podprzestrzeń danych. Żadna pojedyncza
+para reprezentacja--detektor nie wykrywa dobrze wszystkich trzech typów.
+To ważna przesłanka do łączenia detektorów (zadanie~3).
+
+\subsection{Kompromis jakość -- wymiar -- czas}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{\fig{time_vs_quality}}
+  \caption{Łączny czas przygotowania reprezentacji i detekcji a PR-AUC
+  dla konfiguracji wybranych na walidacji (kształt -- reprezentacja,
+  kolor -- detektor).}
+  \label{fig:time}
+\end{figure}
+
+Koszty reprezentacji różnią się o trzy rzędy wielkości (rys.~\ref{fig:time}):
+PCA kosztuje ok. 1~ms, UMAP 0,1--1~s (dopasowanie 0,09--0,61~s
+i transformacja 0,04--0,40~s), a autoenkoder 1--2,4~s uczenia. Czas detekcji
+zależy przede wszystkim od detektora (IForest z 200 drzewami ok. 230~ms,
+LOF i OCSVM 2--5~ms) i tylko nieznacznie od wymiaru reprezentacji, bo przy
+kilkuset obserwacjach dominują narzuty stałe. Najkorzystniejszy kompromis
+dają: \textbf{PCA z LOF/OCSVM} (kilka ms, najlepsze wyniki na Breast Cancer)
+oraz \textbf{błąd rekonstrukcji PCA} (ok. 1~ms, najlepszy wynik na
+Ionosphere). Autoenkoder jest ok. 1000 razy droższy od PCA przy podobnej
+lub gorszej jakości. Jego przewaga mogłaby się ujawnić dopiero przy silnie
+nieliniowej strukturze danych i większej liczbie obserwacji. UMAP jest
+drogi i szkodliwy dla detekcji.
+
+\subsection{Porównanie z zadaniem 1}
+
+\begin{table}[H]
+  \centering\small
+  \caption{PR-AUC (test) detektorów: najlepsza konfiguracja z zadania~1
+  (dane oryginalne, szersza siatka) oraz najlepsze konfiguracje
+  w poszczególnych reprezentacjach (zadanie~2). Zysk -- różnica między
+  najlepszą reprezentacją a zadaniem~1.}
+  \label{tab:t1}
+  \tab{task1_comparison}
+\end{table}
+
+Wyniki w danych oryginalnych są zgodne z zadaniem~1 (tabela~\ref{tab:t1}).
+Dla LOF i OCSVM wybrano w większości te same konfiguracje, a niewielkie
+różnice wynikają z węższej siatki w zadaniu~2 (tylko jądro RBF w OCSVM --
+na Parkinsons w zadaniu~1 wybrano jądro wielomianowe -- oraz stałe 200
+drzew w IForest). Zmiana reprezentacji poprawiła
+najlepszy wynik z zadania~1 dla 7 z 12 par zbiór--detektor, ale istotnie
+(o ponad 0,1 PR-AUC) tylko w pięciu: IForest na Ionosphere (+0,19), Parkinsons
+(+0,10) i zbiorze syntetycznym (+0,12) oraz LOF i OCSVM na Breast Cancer
+(+0,16 i +0,13). We wszystkich tych przypadkach najlepszą reprezentacją było PCA.
+Dla najlepszych detektorów z zadania~1 (OCSVM na Ionosphere, LOF na
+zbiorze syntetycznym) dane oryginalne pozostają najlepsze. Najbardziej
+na zmianie reprezentacji zyskuje najsłabszy w zadaniu~1 detektor
+(Isolation Forest), bo PCA kompensuje jego słabość -- cięcia równoległe do
+osi w danych o skorelowanych cechach. Najlepszy wynik na zbiorze uzyskano
+w zadaniu~2 tylko dla Breast Cancer (0,84 wobec 0,71) i Ionosphere
+(rekonstrukcja PCA 0,93 wobec 0,90).
+
+\section{Odpowiedzi na pytania analityczne}
+
+\paragraph{a) Czy redukcja wymiarowości zawsze poprawia skuteczność
+detekcji?} Nie. W porównaniu z danymi oryginalnymi PCA poprawiło wyniki
+w 6 z 12 par zbiór--detektor (we wszystkich czterech dla IForest), UMAP --
+w trzech (IForest i LOF na Parkinsons, OCSVM na Breast Cancer; poza IForest
+na Parkinsons o mniej niż 0,03, czyli w granicach szumu), a przestrzeń
+latentna autoenkodera -- w czterech, ale o więcej niż 0,03 tylko w dwóch
+(IForest na Parkinsons +0,10, LOF na Breast Cancer +0,03). Redukcja pomaga, gdy
+informacja odróżniająca anomalie leży w kierunkach o dużej wariancji, a
+pozostałe wymiary niosą głównie szum (Breast Cancer: $k=1$). Szkodzi, gdy
+anomalie odchylają się w kierunkach o małej wariancji (anomalie
+podprzestrzenne: Recall 0,91 $\to$ 0,01 przy 91\,\% zachowanej wariancji)
+albo gdy metoda redukcji zmienia geometrię (UMAP).
+
+\paragraph{b) Czy anomalie pozostają odseparowane od normalnych w przestrzeni
+zredukowanej?} Zależy to od reprezentacji i typu anomalii. Anomalie globalne
+pozostają odseparowane w PCA i autoenkoderze. Anomalie podprzestrzenne
+znikają w każdej reprezentacji niskowymiarowej, choć pozostają widoczne
+w jej błędzie rekonstrukcji. UMAP przesuwa anomalie do skupisk (silhouette
+syntetyczny 0,26 $\to$ 0,00, Ionosphere 0,33 $\to$ $-0{,}06$). Na
+Parkinsons anomalie nie są odseparowane w żadnej przestrzeni (silhouette
+$<0{,}08$).
+
+\paragraph{c) Która reprezentacja jest najbardziej użyteczna dla
+poszczególnych detektorów?} Isolation Forest: \textbf{PCA} (najlepsze na
+wszystkich 4 zbiorach, obrót do osi głównych). LOF: \textbf{dane oryginalne}
+lub \textbf{PCA z umiarkowanym $k$} (Breast Cancer). LOF jest wrażliwy na
+szum wymiarów, ale też na utratę kierunków o małej wariancji. OCSVM:
+\textbf{dane oryginalne} lub \textbf{PCA}; granica jądrowa w pełnej
+przestrzeni działa dobrze, gdy $\gamma$ jest dobrane do wymiaru. Błąd
+rekonstrukcji (PCA lub autoenkoder) to osobny, komplementarny detektor --
+najlepszy, gdy anomalie są rozproszone i leżą poza podprzestrzenią danych.
+
+\paragraph{d) Czy najlepsza wizualnie separacja odpowiada najwyższej jakości
+detekcji?} Nie. Najczytelniejsze wizualnie reprezentacje (UMAP 2D) dają
+najgorszą detekcję, bo zamieniają anomalie w zwarte skupiska. Liczbowa
+separacja w pełnej reprezentacji (silhouette) koreluje z jakością detekcji
+($r$ do 0,98), ale nie zawsze (Parkinsons $r=0{,}05$, Breast Cancer
+$r=0{,}74$).
+
+\paragraph{e) Jaki jest kompromis między jakością wyników a kosztem
+obliczeniowym?} Najlepszy stosunek jakości do kosztu ma PCA (ok. 1~ms,
+często poprawa wyników). UMAP i autoenkoder kosztują 100--1000 razy
+więcej i w badanych danych nie dają lepszych wyników niż PCA. Większy
+wymiar reprezentacji nie zwiększa istotnie kosztu detekcji przy tej skali
+danych, a często poprawia jakość (UMAP $m=10$, PCA $k=20$). Nie należy
+więc redukować wymiaru ,,na zapas''. Koszt detekcji determinuje wybór
+detektora (IForest ok. 60 razy wolniejszy od LOF przy tych rozmiarach).
+
+\section{Rekomendacje i dyskusja}
+
+\paragraph{Dlaczego reprezentacja poprawia lub pogarsza wyniki?} Mechanizm
+jest wspólny: detektor ocenia odstawanie w pewnej metryce (odległość,
+gęstość, łatwość izolacji). Reprezentacja zmienia tę metrykę.
+\begin{itemize}
+  \item Poprawa następuje, gdy reprezentacja (1) usuwa wymiary szumu, które
+  rozmywały odległości (PCA na Breast Cancer, LOF dla anomalii lokalnych),
+  albo (2) dopasowuje geometrię do mechanizmu detektora (obrót PCA dla
+  cięć osiowych IForest).
+  \item Pogorszenie następuje, gdy reprezentacja (1) usuwa kierunki, w których
+  anomalie się odchylają (PCA z małym $k$, przestrzeń latentna dla anomalii
+  podprzestrzennych), albo (2) celowo zniekształca gęstość (UMAP).
+\end{itemize}
+
+\paragraph{Rekomendacje.}
+\begin{enumerate}
+  \item \textbf{Isolation Forest} -- stosować na składowych PCA z dużym $k$
+  (prawie bez redukcji, ale z obrotem do osi głównych).
+  \item \textbf{LOF} -- dane oryginalne. Redukcja PCA tylko wtedy, gdy
+  walidacja wskazuje, że wiele cech to szum; nie schodzić poniżej
+  $\approx 95$--99\,\% wariancji, jeśli możliwe są anomalie w kierunkach
+  o małej wariancji.
+  \item \textbf{OCSVM} -- dane oryginalne lub PCA z umiarkowanym $k$,
+  zawsze z $\gamma$ dobranym do wymiaru reprezentacji.
+  \item \textbf{Zawsze} sprawdzić błąd rekonstrukcji PCA jako tani,
+  komplementarny detektor anomalii ,,poza strukturą danych''.
+  \item \textbf{UMAP} -- tylko do wizualizacji, nie jako wejście detektora.
+  \item \textbf{Autoenkoder} -- przy małych zbiorach nie uzasadnia swojego
+  kosztu. Gdy jest używany, wynikiem powinien być błąd rekonstrukcji,
+  a nie odległości w przestrzeni latentnej. Należy pamiętać, że uczony na
+  danych zanieczyszczonych może ,,nauczyć się'' skupisk anomalii.
+\end{enumerate}
+
+\paragraph{Ograniczenia.} Zbiory są małe (80--500 obserwacji uczących), co
+sprzyja PCA, a ogranicza autoenkoder i UMAP. Wybór spośród wielu wariantów
+reprezentacji na małej walidacji grozi przeuczeniem wyboru (UMAP na
+Parkinsons: PR-AUC 0,50 na walidacji, 0,30 na teście). Zbadano tylko jedną
+rodzinę architektur autoenkodera (MLP) i uczenie na danych
+zanieczyszczonych. Wariant uczenia tylko na danych normalnych (scenariusz
+półnadzorowany) zmieniłby wyniki rekonstrukcji. Trustworthiness i silhouette
+liczono na części testowej o 40--250 obserwacjach.
+
+\paragraph{Kierunki dalszych badań.} Odporne PCA (np. Robust PCA) mniej
+wrażliwe na anomalie w części uczącej, autoenkodery uczone na danych
+oczyszczonych przez inny detektor, łączenie wyników detektorów
+z różnych reprezentacji (zadanie~3) oraz ocena na większych zbiorach,
+na których metody nieliniowe mają szansę się wykazać.
+
+\section{Wnioski}
+
+\begin{enumerate}
+  \item Reprezentacja danych ma duży wpływ na detekcję: rozrzut PR-AUC
+  jednego detektora między reprezentacjami sięga 0,75 (IForest na Ionosphere:
+  0,14 w UMAP wobec 0,89 w PCA). Wpływ ten jest jednak przede wszystkim
+  \emph{negatywny} -- łatwo go pogorszyć, trudno istotnie poprawić najlepszy
+  wynik z danych oryginalnych.
+  \item PCA jest najbardziej użyteczną reprezentacją: tanią, często
+  poprawiającą wyniki (szczególnie IForest), a jej błąd rekonstrukcji jest
+  osobnym, wartościowym detektorem (najlepszy wynik na Ionosphere: 0,93).
+  \item Zachowana wariancja nie jest dobrym kryterium wyboru liczby
+  składowych dla detekcji: 91\,\% wariancji może oznaczać utratę 99\,\%
+  informacji o anomaliach podprzestrzennych.
+  \item UMAP pogarsza detekcję, bo normalizuje lokalną gęstość i zamienia
+  grupy anomalii w zwarte skupiska -- najlepsza wizualnie separacja nie
+  oznacza najlepszej detekcji.
+  \item Żadna para reprezentacja--detektor nie wykrywa wszystkich typów
+  anomalii, co uzasadnia łączenie komplementarnych detektorów w zadaniu~3.
+\end{enumerate}
+
+\section{Odtworzenie wyników}
+
+\begin{verbatim}
+python -m task2_representations.run       # ok. 15 min, 3 procesy (N_JOBS)
+python -m task2_representations.analyze   # tabele i rysunki
+\end{verbatim}
+
+\end{document}

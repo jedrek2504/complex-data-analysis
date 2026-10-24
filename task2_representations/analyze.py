@@ -32,7 +32,7 @@ MAIN_AE = '"hidden": [64, 32]'
 
 
 def load():
-    runs = pd.read_csv(OUT / "runs.csv")
+    runs = pd.read_csv(OUT / "runs.csv.gz")
     structure = pd.read_csv(OUT / "structure.csv")
     runs["main"] = (runs.rep != "AE") | runs.rep_params.str.contains(MAIN_AE, regex=False)
     structure["main"] = (structure.rep != "AE") | structure.rep_params.str.contains(

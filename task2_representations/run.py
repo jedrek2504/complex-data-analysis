@@ -6,7 +6,7 @@ fitted in the representation space with a small hyperparameter grid. PCA and
 the autoencoder also provide their own score (reconstruction error).
 Representation and detector settings are chosen later on validation data.
 
-Outputs (results/task2/): runs.csv, structure.csv, embeddings_2d.csv.gz,
+Outputs (results/task2/): runs.csv.gz, structure.csv, embeddings_2d.csv.gz,
 ae_history.csv
 """
 
@@ -156,7 +156,7 @@ def main():
     jobs = [(d, s) for d in HIGHDIM_DATASETS for s in SEEDS]
     paths = Parallel(n_jobs=N_JOBS, verbose=5)(delayed(cached_job)(d, s) for d, s in jobs)
     results = [pd.read_pickle(p) for p in paths]
-    pd.DataFrame([r for res in results for r in res[0]]).to_csv(OUT / "runs.csv", index=False)
+    pd.DataFrame([r for res in results for r in res[0]]).to_csv(OUT / "runs.csv.gz", index=False)
     pd.DataFrame([r for res in results for r in res[1]]).to_csv(OUT / "structure.csv", index=False)
     pd.concat([e for res in results for e in res[2]]).to_csv(
         OUT / "embeddings_2d.csv.gz", index=False)

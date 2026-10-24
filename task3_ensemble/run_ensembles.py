@@ -156,7 +156,9 @@ def run_split(df, base_time):
             "coverage": hits.max(axis=0).mean() if hits.size else np.nan,
             "unique_hits": (hits.sum(axis=0) == 1).mean() if hits.size else np.nan,
             "false_alarms_single": ((dec_f1[:, y_te == 0].sum(axis=0) == 1).sum()
-                                    / max((dec_f1[:, y_te == 0].sum(axis=0) >= 1).sum(), 1))}
+                                    / max((dec_f1[:, y_te == 0].sum(axis=0) >= 1).sum(), 1)),
+            # known before testing: how much the best detector stands out
+            "val_quality_gap": val_ap.max() - np.delete(val_ap, val_ap.argmax()).mean()}
     dec = pd.DataFrame({"row": rows_te, "y": y_te, "kind": k_te,
                         **{b: dec_f1[i] for i, b in enumerate(BASE)}, **decisions})
     return results, dec, comp, J

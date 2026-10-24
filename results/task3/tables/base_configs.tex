@@ -1,0 +1,22 @@
+\begin{tabular}{llllr}
+\toprule
+Zbiór & Detektor & Reprezentacja & Parametry & PR-AUC wal. (Zad. 2) \\
+\midrule
+Breast Cancer & IForest & PCA ($k$=1) & $T$=200 & 0,706 \\
+ & LOF & PCA ($k$=1) & $k$=50 & 0,842 \\
+ & OCSVM & PCA ($k$=1) & $\nu$=0,50, $\gamma$=1,0/$d$ & 0,844 \\
+ & PCA (rekonstr.) & PCA ($k$=20) & błąd rekonstrukcji & 0,404 \\
+Ionosphere & IForest & PCA ($k$=20) & $T$=200 & 0,900 \\
+ & LOF & oryginalna & $k$=20 & 0,866 \\
+ & OCSVM & oryginalna & $\nu$=0,05, $\gamma$=10,0/$d$ & 0,956 \\
+ & PCA (rekonstr.) & PCA ($k$=8) & błąd rekonstrukcji & 0,964 \\
+Parkinsons & IForest & UMAP ($m$=10, nn=5, md=0,5) & $T$=200 & 0,382 \\
+ & LOF & UMAP ($m$=5, nn=15, md=0,0) & $k$=50 & 0,498 \\
+ & OCSVM & UMAP ($m$=2, nn=15, md=0,5) & $\nu$=0,50, $\gamma$=0,1/$d$ & 0,471 \\
+ & PCA (rekonstr.) & PCA ($k$=1) & błąd rekonstrukcji & 0,316 \\
+Synthetic & IForest & PCA ($k$=20) & $T$=200 & 0,749 \\
+ & LOF & oryginalna & $k$=35 & 0,951 \\
+ & OCSVM & oryginalna & $\nu$=0,05, $\gamma$=1,0/$d$ & 0,827 \\
+ & PCA (rekonstr.) & PCA ($k$=5) & błąd rekonstrukcji & 0,746 \\
+\bottomrule
+\end{tabular}

@@ -1,0 +1,17 @@
+dataset,base,rep,rep_params,detector,det_params,val_pr_auc_task2,test_pr_auc_task2
+breast_cancer,IForest,PCA,"{""n_components"": 1}",IForest,"{""n_estimators"": 200}",0.7059421082853188,0.7159648631946091
+breast_cancer,LOF,PCA,"{""n_components"": 1}",LOF,"{""n_neighbors"": 50}",0.8419617885816812,0.8349673828025537
+breast_cancer,OCSVM,PCA,"{""n_components"": 1}",OCSVM,"{""gamma_factor"": 1.0, ""kernel"": ""rbf"", ""nu"": 0.5}",0.8444716030023691,0.8396342439169648
+breast_cancer,PCA,PCA,"{""n_components"": 20}",Reconstruction,{},0.4040467242685254,0.4947596937135018
+ionosphere,IForest,PCA,"{""n_components"": 20}",IForest,"{""n_estimators"": 200}",0.9001199671787907,0.8893071988398074
+ionosphere,LOF,Original,{},LOF,"{""n_neighbors"": 20}",0.8660890709532014,0.8484779906114491
+ionosphere,OCSVM,Original,{},OCSVM,"{""gamma_factor"": 10.0, ""kernel"": ""rbf"", ""nu"": 0.05}",0.955886752136752,0.8999205399863293
+ionosphere,PCA,PCA,"{""n_components"": 8}",Reconstruction,{},0.9644246031746032,0.9261800787281428
+parkinsons,IForest,UMAP,"{""min_dist"": 0.5, ""n_components"": 10, ""n_neighbors"": 5}",IForest,"{""n_estimators"": 200}",0.3818230486119329,0.2441760629385402
+parkinsons,LOF,UMAP,"{""min_dist"": 0.0, ""n_components"": 5, ""n_neighbors"": 15}",LOF,"{""n_neighbors"": 50}",0.4975192101605259,0.2979089887036238
+parkinsons,OCSVM,UMAP,"{""min_dist"": 0.5, ""n_components"": 2, ""n_neighbors"": 15}",OCSVM,"{""gamma_factor"": 0.1, ""kernel"": ""rbf"", ""nu"": 0.5}",0.4706208773261667,0.3351080394841663
+parkinsons,PCA,PCA,"{""n_components"": 1}",Reconstruction,{},0.3158397448771052,0.2930428128636592
+synthetic,IForest,PCA,"{""n_components"": 20}",IForest,"{""n_estimators"": 200}",0.7491392560696557,0.7526091917175082
+synthetic,LOF,Original,{},LOF,"{""n_neighbors"": 35}",0.9505391577492258,0.929001580720089
+synthetic,OCSVM,Original,{},OCSVM,"{""gamma_factor"": 1.0, ""kernel"": ""rbf"", ""nu"": 0.05}",0.8267548500872302,0.8184109913262608
+synthetic,PCA,PCA,"{""n_components"": 5}",Reconstruction,{},0.7462718503127463,0.7379273072761762

@@ -1,0 +1,38 @@
+\begin{tabular}{lllrrrrrr}
+\toprule
+Normalizacja & Wagi & Detektory & PR-AUC & $\Delta$PR-AUC & F1 (próg wal.) & $\Delta$F1 & F1 (próg $c$) & Wygrane (z 4) \\
+\midrule
+min-max & równe & wszystkie & 0,724 & -0,027 & 0,645 & -0,014 & 0,647 & 2 \\
+min-max & równe & zachłanny wybór & 0,739 & -0,012 & 0,637 & -0,022 & 0,651 & 2 \\
+min-max & PR-AUC & wszystkie & 0,725 & -0,025 & 0,638 & -0,021 & 0,643 & 2 \\
+min-max & PR-AUC & zachłanny wybór & 0,746 & -0,005 & 0,639 & -0,020 & 0,651 & 2 \\
+min-max & skill & wszystkie & 0,721 & -0,029 & 0,642 & -0,017 & 0,639 & 1 \\
+min-max & skill & zachłanny wybór & 0,741 & -0,009 & 0,639 & -0,020 & 0,652 & 2 \\
+min-max & skill$\times$różn. & wszystkie & 0,715 & -0,035 & 0,640 & -0,019 & 0,636 & 1 \\
+min-max & skill$\times$różn. & zachłanny wybór & 0,740 & -0,011 & 0,639 & -0,020 & 0,652 & 2 \\
+z-score & równe & wszystkie & 0,721 & -0,029 & 0,659 & -0,000 & 0,642 & 2 \\
+z-score & równe & zachłanny wybór & 0,741 & -0,010 & 0,637 & -0,022 & 0,651 & 1 \\
+z-score & PR-AUC & wszystkie & 0,723 & -0,027 & 0,639 & -0,020 & 0,645 & 1 \\
+z-score & PR-AUC & zachłanny wybór & 0,742 & -0,009 & 0,638 & -0,021 & 0,653 & 1 \\
+z-score & skill & wszystkie & 0,723 & -0,027 & 0,639 & -0,020 & 0,644 & 1 \\
+z-score & skill & zachłanny wybór & 0,741 & -0,009 & 0,638 & -0,021 & 0,653 & 1 \\
+z-score & skill$\times$różn. & wszystkie & 0,717 & -0,034 & 0,633 & -0,026 & 0,635 & 1 \\
+z-score & skill$\times$różn. & zachłanny wybór & 0,739 & -0,011 & 0,638 & -0,021 & 0,653 & 1 \\
+odporny z & równe & wszystkie & 0,722 & -0,028 & 0,661 & +0,002 & 0,648 & 1 \\
+odporny z & równe & zachłanny wybór & 0,738 & -0,012 & 0,648 & -0,011 & 0,655 & 1 \\
+odporny z & PR-AUC & wszystkie & 0,733 & -0,017 & 0,656 & -0,003 & 0,644 & 1 \\
+odporny z & PR-AUC & zachłanny wybór & 0,740 & -0,011 & 0,639 & -0,020 & 0,644 & 1 \\
+odporny z & skill & wszystkie & 0,733 & -0,017 & 0,657 & -0,002 & 0,642 & 1 \\
+odporny z & skill & zachłanny wybór & 0,737 & -0,013 & 0,638 & -0,021 & 0,645 & 1 \\
+odporny z & skill$\times$różn. & wszystkie & 0,724 & -0,027 & 0,672 & +0,013 & 0,636 & 1 \\
+odporny z & skill$\times$różn. & zachłanny wybór & 0,737 & -0,014 & 0,639 & -0,021 & 0,644 & 1 \\
+rangi & równe & wszystkie & 0,710 & -0,040 & 0,652 & -0,007 & 0,626 & 2 \\
+rangi & równe & zachłanny wybór & 0,725 & -0,025 & 0,639 & -0,020 & 0,655 & 0 \\
+rangi & PR-AUC & wszystkie & 0,716 & -0,034 & 0,637 & -0,022 & 0,614 & 2 \\
+rangi & PR-AUC & zachłanny wybór & 0,726 & -0,024 & 0,634 & -0,025 & 0,645 & 0 \\
+rangi & skill & wszystkie & 0,719 & -0,032 & 0,640 & -0,019 & 0,615 & 2 \\
+rangi & skill & zachłanny wybór & 0,726 & -0,024 & 0,634 & -0,025 & 0,646 & 0 \\
+rangi & skill$\times$różn. & wszystkie & 0,711 & -0,040 & 0,624 & -0,035 & 0,606 & 2 \\
+rangi & skill$\times$różn. & zachłanny wybór & 0,721 & -0,029 & 0,634 & -0,025 & 0,645 & 0 \\
+\bottomrule
+\end{tabular}

@@ -1,0 +1,52 @@
+% Common preamble of the task reports (compile with XeLaTeX).
+\usepackage{fontspec}
+\usepackage{polyglossia}
+\setmainlanguage{polish}
+\usepackage{amsmath,amssymb}
+\usepackage[a4paper,margin=2.3cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{float}
+\usepackage[font=small,labelfont=bf]{caption}
+\usepackage{subcaption}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+% Without the texlive-lang-polish package XeLaTeX would hyphenate Polish
+% words with English patterns, so hyphenation is switched off and looser
+% inter-word spacing is allowed instead. With Polish patterns installed the
+% next two penalties can be removed.
+\hyphenpenalty=10000
+\exhyphenpenalty=10000
+\tolerance=3000
+\emergencystretch=3em
+\setlist{itemsep=2pt,topsep=4pt}
+\setlength{\parskip}{3pt}
+\renewcommand{\arraystretch}{1.12}
+
+\newcommand{\tab}[1]{\input{\resultsdir/tables/#1}}
+\newcommand{\fig}[1]{\resultsdir/figures/#1}
+\newcommand{\code}[1]{\texttt{#1}}
+
+% \maketitlepage{task title}{subtitle}
+\newcommand{\maketitlepage}[2]{%
+  \begin{titlepage}
+    \centering
+    {\large Politechnika Łódzka\\Wydział Fizyki Technicznej, Informatyki i Matematyki Stosowanej\par}
+    \vspace{3.2cm}
+    {\large Analiza danych złożonych z detekcją wyjątków\par}
+    \vspace{0.8cm}
+    {\LARGE\bfseries #1\par}
+    \vspace{0.4cm}
+    {\large #2\par}
+    \vfill
+    {\large Jędrzej Kostyk\par}
+    {nr indeksu 264339\par}
+    \vspace{1.2cm}
+    {Rok akademicki 2026/2027\par}
+  \end{titlepage}
+}

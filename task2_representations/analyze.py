@@ -171,6 +171,39 @@ def table_types(best):
     tabular(pd.DataFrame(rows), TAB / "recall_by_type_synthetic.tex", align="llrrrr")
 
 
+def table_pca_types(runs):
+    """Synthetic data: recall per anomaly type as a function of PCA components."""
+    pca = runs[(runs.dataset == "synthetic") & (runs.rep == "PCA")].copy()
+    pca["k"] = pca.rep_params.map(lambda p: json.loads(p)["n_components"])
+    orig = runs[(runs.dataset == "synthetic") & (runs.rep == "Original")]
+    rows = []
+
+    def row(det, k, r, first):
+        return {"Detektor": DET_LABEL[det] if first else "", "$k$": k, "zach. wariancja": "",
+                "PR-AUC": num(r.test_pr_auc), "R globalne": num(r.test_recall_global),
+                "R lokalne": num(r.test_recall_local),
+                "R podprzestrzenne": num(r.test_recall_subspace)}
+
+    for det in ("LOF", "IForest", "Reconstruction"):
+        first = True
+        if det != "Reconstruction":
+            ref = select(orig[orig.detector == det], ["dataset"]).iloc[0]
+            rows.append(dict(row(det, "oryg. (30)", ref, first), **{"zach. wariancja": "1,00"}))
+            first = False
+        best = select(pca[pca.detector == det], ["k"]).sort_values("k")
+        for _, r in best[best.k.isin([2, 3, 5, 10, 20])].iterrows():
+            rows.append(row(det, str(int(r.k)), r, first))
+            first = False
+    st = pd.read_csv(OUT / "structure.csv")
+    st = st[(st.dataset == "synthetic") & (st.rep == "PCA")]
+    ev = st.assign(k=st.rep_params.map(lambda p: json.loads(p)["n_components"])).groupby(
+        "k").explained_variance.mean()
+    for r in rows:
+        if r["$k$"].isdigit():
+            r["zach. wariancja"] = num(ev[int(r["$k$"])], 2)
+    tabular(pd.DataFrame(rows), TAB / "pca_types_synthetic.tex", align="llrrrrr")
+
+
 # ------------------------------------------------------------------ figures
 
 def fig_matrix(best):
@@ -409,6 +442,7 @@ def main():
     comparison.to_csv(OUT / "task1_comparison.csv", index=False)
     table_ae_architecture(runs, structure)
     table_types(best)
+    table_pca_types(runs[runs.main])
 
     fig_matrix(best)
     fig_pca(runs[runs.main], structure)

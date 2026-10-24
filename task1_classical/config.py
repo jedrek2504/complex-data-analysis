@@ -7,7 +7,7 @@ over the training scores, so all its values reuse one fitted model.
 
 from itertools import product
 
-CONTAMINATIONS = (0.02, 0.05, 0.10, 0.15, 0.20)
+CONTAMINATIONS = (0.02, 0.05, 0.10, 0.15, 0.20, 0.35)  # 0.35: Breastw
 METHODS = ("IForest", "LOF", "COF", "OCSVM", "DBSCAN")
 
 

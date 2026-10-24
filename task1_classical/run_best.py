@@ -19,7 +19,7 @@ from common.anomaly_types import anomaly_kind
 from common.datasets import TASK1_DATASETS
 from common.detectors import build
 from common.metrics import best_f1_threshold, evaluate
-from common.protocol import SEEDS, make_experiment
+from common.protocol import make_experiment, seeds_for
 from task1_classical.config import METHODS
 from task1_classical.run_grid import OUT
 
@@ -40,9 +40,9 @@ def main():
 
     metrics, predictions = [], []
     for dataset in TASK1_DATASETS:
-        for seed in SEEDS:
+        for seed in seeds_for(dataset):
             exp = make_experiment(dataset, seed)
-            kinds = anomaly_kind(dataset, seed)[exp.idx_test]
+            kinds = anomaly_kind(dataset)[exp.idx_test]
             for method in METHODS:
                 row = best[(best.dataset == dataset) & (best.method == method)].iloc[0]
                 params = json.loads(row.params)

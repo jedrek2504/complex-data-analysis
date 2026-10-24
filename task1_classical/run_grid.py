@@ -9,19 +9,21 @@ Output: results/task1/grid.csv
 """
 
 import json
+import os
 import time
 
 import pandas as pd
-from tqdm import tqdm
+from joblib import Parallel, delayed
 
 from common import ROOT
 from common.datasets import TASK1_DATASETS
 from common.detectors import build
 from common.metrics import best_f1_threshold, evaluate
-from common.protocol import SEEDS, make_experiment
+from common.protocol import make_experiment, seeds_for
 from task1_classical.config import CONTAMINATIONS, score_grid, uses_contamination
 
 OUT = ROOT / "results" / "task1"
+N_JOBS = int(os.environ.get("N_JOBS", 3))
 
 
 def run_config(exp, method, params):
@@ -56,16 +58,19 @@ def run_config(exp, method, params):
     return rows
 
 
+def run_job(dataset, seed):
+    exp = make_experiment(dataset, seed)
+    rows = []
+    for method, params in score_grid():
+        rows.extend(run_config(exp, method, params))
+    return rows
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    configs = list(score_grid())
-    rows = []
-    jobs = [(d, s) for d in TASK1_DATASETS for s in SEEDS]
-    for dataset, seed in tqdm(jobs, desc="task1 grid"):
-        exp = make_experiment(dataset, seed)
-        for method, params in configs:
-            rows.extend(run_config(exp, method, params))
-    pd.DataFrame(rows).to_csv(OUT / "grid.csv", index=False)
+    jobs = [(d, s) for d in TASK1_DATASETS for s in seeds_for(d)]
+    results = Parallel(n_jobs=N_JOBS, verbose=5)(delayed(run_job)(d, s) for d, s in jobs)
+    pd.DataFrame([r for rows in results for r in rows]).to_csv(OUT / "grid.csv", index=False)
 
 
 if __name__ == "__main__":

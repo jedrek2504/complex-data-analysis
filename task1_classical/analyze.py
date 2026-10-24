@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from common.agreement import jaccard_matrix
-from common.datasets import DISPLAY_NAMES, TASK1_DATASETS
+from common.datasets import DISPLAY_NAMES, SPECS, TASK1_DATASETS
 from common.latex import num, pm, tabular
 from common.plotting import BLUES, METHOD_COLORS, TYPE_LABELS, save, setup
 from task1_classical.config import CONTAMINATIONS, METHODS
@@ -97,7 +97,7 @@ def table_kinds(preds):
     counts = sub[sub.method == "IForest"].groupby(["dataset", "kind"]).size()
     rows = []
     for d in TASK1_DATASETS:
-        kinds = [k for k in ("global", "local", "subspace") if (d, k) in rec.index]
+        kinds = [k for k in ("global", "local") if (d, k) in rec.index]
         for i, k in enumerate(kinds):
             r = rec.loc[(d, k)]
             best_v = r.max()
@@ -105,7 +105,7 @@ def table_kinds(preds):
                      for m, v in r.items()}
             rows.append({"Zbiór": DISPLAY_NAMES[d] if i == 0 else "",
                          "Typ": TYPE_LABELS[k],
-                         "$n$ (10 pow.)": str(counts[(d, k)]), **cells})
+                         "$n$ (suma pow.)": str(counts[(d, k)]), **cells})
     tabular(pd.DataFrame(rows), TAB / "recall_by_kind.tex", align="llr" + "r" * 5)
     return rec
 
@@ -195,7 +195,7 @@ def fig_contamination(grid):
             g = sub[(sub.dataset == d) & (sub.method == m)].groupby("contamination")
             axes[0, j].plot(g.test_precision.mean(), marker="o", color=METHOD_COLORS[m], label=m)
             axes[1, j].plot(g.test_recall.mean(), marker="o", color=METHOD_COLORS[m])
-        true_rate = 0.042 if d == "glass" else 0.10
+        true_rate = SPECS[d].anomalies / SPECS[d].n
         for ax in axes[:, j]:
             ax.axvline(true_rate, color="#52514e", lw=0.8, ls="--")
         axes[1, j].set_xlabel("contamination $c$")
@@ -369,17 +369,17 @@ def fig_overlap(preds):
 def fig_kinds(rec):
     fig, axes = plt.subplots(1, 5, figsize=(13, 2.6), sharey=True)
     for ax, d in zip(axes, TASK1_DATASETS):
-        kinds = [k for k in ("global", "local", "subspace") if (d, k) in rec.index]
+        kinds = [k for k in ("global", "local") if (d, k) in rec.index]
         width = 0.8 / len(kinds)
-        shades = {"global": BLUES(0.85), "local": BLUES(0.5), "subspace": BLUES(0.25)}
+        shades = {"global": BLUES(0.85), "local": BLUES(0.45)}
         for i, k in enumerate(kinds):
             ax.bar(np.arange(5) + (i - (len(kinds) - 1) / 2) * width, rec.loc[(d, k)].values,
                    width * 0.9, color=shades[k], label=TYPE_LABELS[k])
         ax.set_xticks(range(5), METHODS, rotation=45, fontsize=7)
         ax.set_title(DISPLAY_NAMES[d])
-    handles = [plt.Rectangle((0, 0), 1, 1, color=BLUES(v)) for v in (0.85, 0.5, 0.25)]
-    fig.legend(handles, [TYPE_LABELS[k] for k in ("global", "local", "subspace")],
-               ncol=3, loc="upper center", bbox_to_anchor=(0.5, 1.1))
+    handles = [plt.Rectangle((0, 0), 1, 1, color=BLUES(v)) for v in (0.85, 0.45)]
+    fig.legend(handles, [TYPE_LABELS[k] for k in ("global", "local")],
+               ncol=2, loc="upper center", bbox_to_anchor=(0.5, 1.1))
     axes[0].set_ylabel("Recall wg typu anomalii")
     save(fig, FIG / "recall_by_kind")
 

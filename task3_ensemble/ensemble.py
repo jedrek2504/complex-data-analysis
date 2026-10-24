@@ -58,12 +58,19 @@ class Rank:
 NORMALISERS = {"minmax": MinMax, "zscore": ZScore, "robust": RobustZ, "rank": Rank}
 
 
-def normalise(train, *others, method="rank"):
-    """Fit one normaliser per detector on its training scores."""
-    out = [np.empty_like(train, float)] + [np.empty_like(o, float) for o in others]
-    for k in range(len(train)):
-        norm = NORMALISERS[method]().fit(train[k])
-        for arr, src in zip(out, (train, *others)):
+def normalise(fit, *parts, method="rank"):
+    """Fit one normaliser per detector on ``fit`` and apply it to ``parts``.
+
+    ``fit`` holds unlabelled scores, (n_detectors, n). In-sample training
+    scores are often optimistic (a kernel or neighbourhood model scores its
+    own training points as very normal), so fitting on out-of-sample scores
+    of the validation part makes the normalised scales comparable with the
+    test scores. Labels are never used here.
+    """
+    out = [np.empty_like(p, float) for p in parts]
+    for k in range(len(fit)):
+        norm = NORMALISERS[method]().fit(fit[k])
+        for arr, src in zip(out, parts):
             arr[k] = norm.transform(src[k])
     return out
 
@@ -152,15 +159,38 @@ def greedy_selection(y_val, S_val, scheme="diverse", tol=1e-3):
     return mask
 
 
+def competent_set(y_val, S_val, n_boot=500, alpha=0.1, seed=0):
+    """Detectors not significantly worse than the best one on validation data.
+
+    The validation PR-AUC of every detector is re-estimated on bootstrap
+    resamples of the validation part (each resample keeps at least one
+    anomaly). Detector k is kept when it matches or beats the detector with
+    the best validation PR-AUC in at least ``alpha`` of the resamples, i.e.
+    when the data do not allow us to say that it is worse. Returns a mask.
+    """
+    rng = np.random.default_rng(seed)
+    ap = skill(y_val, S_val)[1]
+    best = int(np.argmax(ap))
+    anomalies, normals = np.flatnonzero(y_val == 1), np.flatnonzero(y_val == 0)
+    as_good = np.zeros(len(S_val))
+    for _ in range(n_boot):
+        idx = np.concatenate([rng.choice(anomalies, len(anomalies)),
+                              rng.choice(normals, len(normals))])
+        boot = np.array([average_precision_score(y_val[idx], s[idx]) for s in S_val])
+        as_good += boot >= boot[best]
+    return as_good / n_boot >= alpha
+
+
 # --------------------------------------------------------------- threshold
 
 
-def threshold(rule, y_val, fused_val, fused_train, contamination=0.1):
+def threshold(rule, y_val, fused_val, contamination=0.1):
     """Decision threshold of the fused score.
 
     f1  - maximises F1 on the validation part (uses validation labels),
-    contamination - flags the expected share of training points (no labels).
+    contamination - flags the expected share of validation points
+                    (out-of-sample scores, no labels).
     """
     if rule == "f1":
         return best_f1_threshold(y_val, fused_val)
-    return contamination_threshold(fused_train, contamination)
+    return contamination_threshold(fused_val, contamination)

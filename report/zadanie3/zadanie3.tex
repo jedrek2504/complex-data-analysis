@@ -34,20 +34,30 @@ w \code{analyze.py}.
 
 \section{Dane i protokół}
 
-Wykorzystano te same cztery zbiory co w zadaniu~2 (Breast Cancer,
-Ionosphere, Parkinsons, syntetyczny), aby porównanie z zadaniami 1 i 2 było
-bezpośrednie. Protokół jest taki sam we wszystkich zadaniach: te same 10
-podziałów 50/25/25\,\% (ziarna 0--9), standaryzacja i reprezentacje
-dopasowywane na części uczącej, detektory uczone bez etykiet.
-\textbf{Część walidacyjna} służy do doboru progów poszczególnych detektorów,
-wag, podzbioru detektorów i progu decyzji zespołu. \textbf{Część testowa}
-nie jest używana do żadnej decyzji.
+Wykorzystano te same cztery zbiory benchmarkowe co w zadaniu~2: Cardio
+(ADBench~\cite{adbench}; UCI Cardiotocography~\cite{cardio}), Arrhythmia
+(ODDS~\cite{odds}; UCI Arrhythmia~\cite{arrhythmia}), WDBC (ADBench; UCI
+Breast Cancer Wisconsin (Diagnostic)~\cite{wdbc}) i Campaign (ADBench; UCI
+Bank Marketing~\cite{campaign}). Dzięki temu porównanie z zadaniem~2 jest
+bezpośrednie. Dane i \textbf{etykiety anomalii pochodzą z benchmarków}
+bez żadnych modyfikacji (opis -- raporty z zadań 1 i 2).
 
-Dodatkowo, ponieważ jeden z wariantów (CBF) zaprojektowano po analizie
-niepowodzeń pierwszego (sekcja~\ref{sec:own}), wszystkie warianty oceniono
-ponownie na \textbf{10 nowych podziałach} (ziarna 10--19, inne podpróbki
-anomalii i inne podziały). Nie były one używane w żadnym etapie projektowania
-i stanowią test potwierdzający (sekcja~\ref{sec:confirm}).
+Protokół jest taki sam we wszystkich zadaniach: te same warstwowe podziały
+50/25/25\,\% (10 podziałów dla Cardio i Arrhythmii, 30 dla WDBC, 5 dla
+Campaign), standaryzacja i reprezentacje dopasowywane na części uczącej,
+detektory uczone bez etykiet. \textbf{Część walidacyjna} służy do doboru
+progów poszczególnych detektorów, wag, podzbioru detektorów i progu decyzji
+zespołu. \textbf{Część testowa} nie jest używana do żadnej decyzji.
+Liczba anomalii w części walidacyjnej bardzo się różni między zbiorami:
+2--3 w WDBC, ok. 17 w Arrhythmii, 44 w Cardio i 1160 w Campaign. Jak
+pokażą wyniki, ma to kluczowe znaczenie dla zespołów.
+
+Wszystkie warianty zespołów, w tym oba warianty własne, zostały
+zdefiniowane z ustalonymi parametrami przed uruchomieniem ich na tych
+danych. Dodatkowo oceniono je na \textbf{nowych podziałach} (kolejny blok
+ziaren: 10--19 dla Cardio i Arrhythmii, 30--59 dla WDBC, 5--9 dla Campaign),
+nieużywanych w żadnym etapie wyboru konfiguracji. Stanowią one test
+potwierdzający (sekcja~\ref{sec:confirm}).
 
 \section{Detektory bazowe}
 
@@ -61,12 +71,11 @@ Wybrano cztery detektory o różnych zasadach działania:
 \end{itemize}
 Zgodnie z zaleceniem, konfiguracje wybrano na podstawie wcześniejszych
 eksperymentów. Dla każdego zbioru i detektora przyjęto reprezentację
-i hiperparametry o najwyższej średniej PR-AUC na walidacji
-w zadaniu~2 (tabela~\ref{tab:base}). Detektor bazowy to więc para
-\emph{reprezentacja + algorytm}. Na Breast Cancer trzy detektory działają
-na jednej składowej PCA, a na Parkinsons trzy na UMAP. Ten drugi wybór jest
-skutkiem przeuczenia wyboru na małej walidacji, opisanego w zadaniu~2, i
-przyjęto go świadomie, bez korekty na podstawie testu.
+i hiperparametry o najwyższej średniej PR-AUC na walidacji w zadaniu~2
+(tabela~\ref{tab:base}). Detektor bazowy to więc para
+\emph{reprezentacja + algorytm}, np. OCSVM na dwuwymiarowym UMAP dla Cardio,
+LOF i OCSVM na jednej składowej PCA dla WDBC, LOF i OCSVM w przestrzeni
+latentnej autoenkodera dla Arrhythmii.
 
 \begin{table}[H]
   \centering\small
@@ -97,23 +106,23 @@ każdego detektora:
   referencyjnych mniejszych od $s$.
 \end{itemize}
 
-Kluczowe okazało się \textbf{na czym} dopasować normalizację. Naturalnym
-wyborem są wyniki części uczącej, ale są to wyniki \emph{in-sample}:
-detektor ocenia punkty, na których był uczony. Rysunek~\ref{fig:norm}
-pokazuje skutek dla OCSVM z wąskim jądrem ($\gamma=10/d$) na Ionosphere.
-Punkty uczące są wektorami nośnymi lub leżą tuż przy nich i dostają niskie
-wyniki, a niemal wszystkie punkty testowe -- wyższe niż \emph{każdy} punkt
+Ważne jest, \textbf{na czym} dopasować normalizację. Naturalnym wyborem są
+wyniki części uczącej, ale są to wyniki \emph{in-sample}: detektor ocenia
+punkty, na których był uczony. Rysunek~\ref{fig:norm} pokazuje skutek dla
+OCSVM z wąskim jądrem ($\gamma=10/d$) na Campaign. Punkty uczące są
+wektorami nośnymi lub leżą tuż przy nich i dostają niemal identyczne, niskie
+wyniki, a 71\,\% punktów testowych ma wynik wyższy niż \emph{każdy} punkt
 uczący. Normalizacja rangowa dopasowana na części uczącej przypisuje im
-wszystkim wartość 1 i cała informacja o kolejności ginie. Dlatego
+wszystkim wartość 1 i informacja o ich kolejności ginie. Dlatego
 normalizacje dopasowywano na \textbf{wynikach części walidacyjnej}
 (\emph{out-of-sample}, bez użycia etykiet). Tabela~\ref{tab:norm} pokazuje,
-że dla fuzji przez maksimum z rangami zmiana ta podnosi średnią PR-AUC
-z 0,415 do 0,645.
+że dla fuzji przez maksimum zmiana ta podnosi średnią PR-AUC przy rangach
+z 0,412 do 0,524, a przy z-score z 0,483 do 0,576.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth]{\fig{normalisation}}
-  \caption{OCSVM ($\gamma=10/d$) na Ionosphere, podział 0: rozkład surowych
+  \caption{OCSVM ($\gamma=10/d$) na Campaign, podział 0: rozkład surowych
   wyników części uczącej (in-sample), walidacyjnej i testowej oraz wyniki
   testowe po normalizacji rangowej dopasowanej na części uczącej (nasycenie
   w 1), rangowej dopasowanej na walidacji i odpornym z-score dopasowanym na
@@ -134,8 +143,9 @@ z 0,415 do 0,645.
 
 Każdy detektor podejmuje decyzję binarną na podstawie własnego progu,
 wybranego jako maksymalizujący F1 na walidacji (wariant główny) albo jako
-kwantyl $1-c$ wyników walidacyjnych przy $c=0{,}1$ (wariant ,,c'', bez
-etykiet). Obserwacja jest anomalią, gdy wskaże ją co najmniej $m$ z 4
+kwantyl $1-c$ wyników walidacyjnych, gdzie $c$ to udział anomalii w części
+walidacyjnej (wariant ,,c''; z etykiet wykorzystywana jest tylko ta jedna
+liczba). Obserwacja jest anomalią, gdy wskaże ją co najmniej $m$ z 4
 detektorów, $m\in\{1,2,3,4\}$. Próg $m=1$ to suma (OR), a $m=4$ --
 iloczyn (AND) decyzji. Ranking potrzebny do ROC-AUC i PR-AUC tworzy liczba
 głosów. Jest on taki sam dla każdego $m$, więc te metryki nie zależą od progu.
@@ -157,32 +167,33 @@ znormalizowanym wynikiem. Zbadano schematy wag wyznaczanych na walidacji:
 oraz \textbf{maksimum} znormalizowanych wyników (klasyczna alternatywa
 dla średniej). Każdy schemat zbadano dla wszystkich detektorów i dla
 podzbioru wybranego zachłannie na walidacji. Próg decyzji wyznaczano
-dwoma kryteriami: (1) maksymalizacja F1 na walidacji (używa etykiet
-walidacji; F1 równoważy Precision i Recall, a próg wybrany wprost pod
-raportowaną metrykę jest najprostszy do uzasadnienia), (2) kwantyl
-$1-c$ zfuzjowanych wyników walidacyjnych przy $c=0{,}1$ (nie używa etykiet,
-wymaga jedynie znajomości oczekiwanego udziału anomalii).
+dwoma kryteriami: (1) maksymalizacja F1 na walidacji (F1 równoważy
+Precision i Recall, a próg wybrany wprost pod raportowaną metrykę jest
+najprostszy do uzasadnienia), (2) kwantyl $1-c$ zfuzjowanych wyników
+walidacyjnych, gdzie $c$ to udział anomalii w walidacji (nie wymaga
+wskazania, które punkty są anomaliami).
 
 \subsection{Warianty własne}
 \label{sec:own}
 
-\paragraph{DSF -- \emph{diversity-weighted skill fusion} (wersja 1).}
-Pierwotna propozycja opierała się na założeniu, że zespół zyskuje na
-detektorach, które są dobre \emph{i} wnoszą informację niedostępną dla
-innych. Składa się z rangowej normalizacji (dopasowanej na walidacji),
-wag $w_k\propto \max(0,\mathrm{AP}_k-\pi)\cdot(1-\bar\rho_k)$ oraz
-zachłannego wyboru detektorów. Wybór zaczyna od detektora o najlepszej
+Oba warianty własne odpowiadają na to samo pytanie -- \emph{jak dobrać
+detektory i wagi, gdy jakość detektorów da się ocenić tylko na małej
+walidacji} -- ale w przeciwny sposób.
+
+\paragraph{DSF -- \emph{diversity-weighted skill fusion}.} Założenie: zespół
+zyskuje na detektorach, które są dobre \emph{i} wnoszą informację
+niedostępną dla innych. DSF składa się z rangowej normalizacji (dopasowanej
+na walidacji), wag $w_k\propto \max(0,\mathrm{AP}_k-\pi)\cdot(1-\bar\rho_k)$
+oraz zachłannego wyboru detektorów. Wybór zaczyna od detektora o najlepszej
 walidacyjnej PR-AUC i dodaje kolejne, dopóki poprawiają walidacyjną PR-AUC
 fuzji o więcej niż $10^{-3}$. Próg wybierany jest przez maksymalizację F1
-na walidacji.
+na walidacji. DSF w pełni ufa walidacji: dopasowuje do niej zarówno skład
+zespołu, jak i ciągłe wagi.
 
-\paragraph{CBF -- \emph{competence-based fusion} (wersja 2).} Analiza
-niepowodzeń DSF (sekcja~\ref{sec:fail}) pokazała trzy problemy:
-(a) na walidacji zawierającej 4--16 anomalii zachłanny wybór i ciągłe wagi
-dopasowują się do szumu, (b) człon różnorodności nagradza detektory
-\emph{słabe}, bo słaby detektor jest z definicji mało skorelowany z dobrymi,
-(c) normalizacja rangowa nasyca się powyżej zakresu próby, na której ją
-dopasowano. CBF odpowiada wprost na te problemy:
+\paragraph{CBF -- \emph{competence-based fusion}.} Założenie: przy małej
+walidacji ciągłe wagi i zachłanny wybór dopasowują się do szumu, a człon
+różnorodności nagradza detektory słabe (słaby detektor jest z definicji mało
+skorelowany z dobrymi). CBF:
 \begin{enumerate}
   \item Dla każdego detektora szacuje \emph{niepewność} jego walidacyjnej
   PR-AUC metodą bootstrap (500 prób losowanych ze zwracaniem osobno z anomalii
@@ -206,58 +217,61 @@ jest nieodróżnialnych, uśrednia je i zmniejsza wariancję. Jest to zasada
 \subsection{Pełna tabela wyników}
 
 \begin{center}
-\captionof{table}{Wyniki wszystkich wariantów (część testowa, ziarna 0--9,
-średnia $\pm$ odchylenie std.). Czas -- łączny czas przygotowania
-reprezentacji, uczenia i oceny wykorzystanych detektorów oraz agregacji.
-Pogrubienie -- najlepsza wartość na zbiorze.}
+\captionof{table}{Wyniki wszystkich wariantów (część testowa, podziały
+projektowe, średnia $\pm$ odchylenie std.). Czas -- łączny czas
+przygotowania reprezentacji, uczenia i oceny wykorzystanych detektorów oraz
+agregacji. Pogrubienie -- najlepsza wartość na zbiorze.}
 \label{tab:main}
 \end{center}
 {\footnotesize\setlength{\tabcolsep}{3pt}\tab{main_results}}
 
 Najważniejsze obserwacje z tabeli~\ref{tab:main}:
 \begin{itemize}
-  \item \textbf{Żaden wariant zespołowy nie przewyższa wyraźnie najlepszego
-  pojedynczego detektora na wszystkich zbiorach.} Na Ionosphere zespoły
-  wygrywają: CBF ma PR-AUC 0,922 i F1 0,869, MV 2/4 F1 0,866, a najlepszy
-  pojedynczy detektor PR-AUC 0,898 i F1 0,790. Na Breast Cancer i zbiorze
-  syntetycznym zwykłe uśrednianie przegrywa (fuzja średnia na zbiorze
-  syntetycznym 0,808 wobec 0,929). Na Parkinsons wyniki wszystkich
-  wariantów mieszczą się w szumie.
-  \item \textbf{CBF dorównuje najlepszemu pojedynczemu detektorowi lub go
-  przewyższa na trzech zbiorach} (Breast Cancer 0,834 wobec 0,836,
-  Ionosphere 0,922 wobec 0,898, syntetyczny 0,929 wobec 0,929) i ma
-  najwyższe średnie F1 spośród fuzji (0,679 wobec 0,659 najlepszego
-  pojedynczego). Przegrywa na Parkinsons (0,277 wobec 0,338).
-  \item \textbf{Majority Voting} poprawia F1 tam, gdzie detektory są
-  porównywalnie dobre (Ionosphere +0,08, Parkinsons +0,09), ale traci
-  na Breast Cancer i zbiorze syntetycznym, a jego ranking (liczba głosów,
-  tylko 5 poziomów) daje niską PR-AUC.
-  \item Fuzja przez \textbf{maksimum} (z rangami) jest najgorszym
-  schematem (średnio 0,645): wzmacnia fałszywe alarmy każdego detektora.
+  \item \textbf{Zespół przewyższa najlepszy pojedynczy detektor (wybrany na
+  walidacji) na trzech zbiorach.} Na Cardio DSF osiąga PR-AUC 0,872, a fuzja
+  z wagami skill 0,870, wobec 0,836 dla OCSVM na UMAP. Na Arrhythmii CBF
+  i DSF mają 0,604 i 0,602 wobec 0,590, a na Campaign 0,320 i 0,328 wobec
+  0,303. Przewagi są niewielkie (0,01--0,04), ale dotyczą zbiorów, na których
+  walidacja zawiera kilkadziesiąt lub więcej anomalii.
+  \item \textbf{Na WDBC wszystkie zespoły przegrywają}, mimo że ich składniki
+  są dobre: fuzja średnia 0,785, CBF 0,851 wobec 0,886 najlepszego
+  pojedynczego. LOF i OCSVM na jednej składowej PCA mają osobno 0,92--0,93,
+  a dołączenie słabszych IForest (0,75) i rekonstrukcji (0,46) rozmywa ich
+  wynik. Walidacja z 2--3 anomaliami nie pozwala wiarygodnie odrzucić
+  słabszych detektorów. Nawet wybór najlepszego pojedynczego detektora jest
+  tu niestabilny: w 12 z 30 podziałów walidacja wskazała IForest zamiast LOF.
+  \item \textbf{Majority Voting} ma niską PR-AUC (ranking z liczby głosów ma
+  tylko 5 poziomów), ale w F1 bywa konkurencyjny: MV 2/4 ma najwyższe F1 na
+  Campaign (0,375 wobec 0,318 najlepszego pojedynczego), a MV 3/4 na
+  Arrhythmii dorównuje najlepszemu pojedynczemu (0,532).
+  \item Fuzja przez \textbf{maksimum} (z rangami) jest najgorszym schematem
+  fuzji poza Campaign (średnio 0,524): wzmacnia fałszywe alarmy każdego
+  detektora.
 \end{itemize}
 
 \subsection{Majority Voting: wpływ progu}
 
 Rysunek~\ref{fig:voting} pokazuje klasyczny kompromis. Zwiększanie liczby
-wymaganych głosów podnosi Precision (Ionosphere: 0,66 przy 1/4, 0,88
-przy 2/4, 0,93 przy 3/4, 0,99 przy 4/4) i obniża Recall (0,89 $\to$ 0,88
-$\to$ 0,74 $\to$ 0,64). F1 jest najwyższe przy $m=2$ na trzech zbiorach.
-Reguła AND ($m=4$) jest zbyt restrykcyjna: na Parkinsons, gdzie detektory
-rzadko się zgadzają (Jaccard 0,13--0,26), Recall spada do 0,05. Reguła OR
-($m=1$) daje najwyższy Recall, ale sumuje fałszywe alarmy wszystkich
-detektorów. Na zbiorze syntetycznym próg $m\ge2$ przekreśla wykrywanie
-anomalii lokalnych: wykrywa je tylko LOF, więc nie zbierają drugiego głosu
-(Recall lokalnych 0,66 dla LOF, 0,18 dla MV 2/4, 0 dla MV 3/4).
-Progi wyznaczane z contamination (linie przerywane) są nieco gorsze od
-progów z walidacyjnego F1, ale nie wymagają etykiet.
+wymaganych głosów podnosi Precision (Cardio: 0,38 przy 1/4, 0,59 przy 2/4,
+0,77 przy 3/4, 0,995 przy 4/4) i obniża Recall (0,95 $\to$ 0,82 $\to$ 0,66
+$\to$ 0,35). F1 jest najwyższe przy $m=2$ lub $m=3$. Reguła AND ($m=4$) jest
+zbyt restrykcyjna: na Campaign, gdzie detektory rzadko się zgadzają (Jaccard
+0,07--0,46), Recall spada do 0,06. Reguła OR ($m=1$) daje najwyższy Recall,
+ale sumuje fałszywe alarmy wszystkich detektorów. Głosowanie przekreśla
+unikalną wiedzę jednego detektora: na Cardio OCSVM na UMAP wykrywa 75\,\%
+anomalii lokalnych, a MV 3/4 tylko 54\,\%, bo pozostałe detektory ich nie
+widzą. Progi wyznaczane z udziału anomalii (linie przerywane) dają przy
+$m=2$ nieco wyższe F1 niż progi z walidacyjnego F1 na trzech zbiorach
+(np. WDBC 0,74 wobec 0,71) -- przy bardzo małej walidacji próg z jednego
+kwantyla jest stabilniejszy niż próg optymalizowany na kilku anomaliach.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth]{\fig{voting_threshold}}
   \caption{Majority Voting: Precision, Recall i F1 w zależności od
   wymaganej liczby głosów (linie ciągłe -- progi detektorów z walidacyjnego
-  F1, przerywane -- z contamination 0,1); linia kropkowana -- F1 najlepszego
-  pojedynczego detektora.}
+  F1, przerywane -- z udziału anomalii w walidacji); linia kropkowana -- F1
+  najlepszego pojedynczego detektora.}
   \label{fig:voting}
 \end{figure}
 
@@ -267,39 +281,37 @@ progów z walidacyjnego F1, ale nie wymagają etykiet.
   \centering
   \includegraphics[width=0.95\textwidth]{\fig{jaccard_heatmap}}
   \caption{Indeks Jaccarda zbiorów obserwacji testowych oznaczonych przez
-  pary detektorów bazowych (średnia z 10 podziałów).}
+  pary detektorów bazowych (średnia po podziałach).}
   \label{fig:jac}
 \end{figure}
 
 Rysunek~\ref{fig:jac} pokazuje bardzo różną strukturę zgodności na
 poszczególnych zbiorach:
 \begin{itemize}
-  \item \textbf{Breast Cancer}: LOF, OCSVM i IForest działają na tej samej,
-  jednej składowej PCA i są silnie zgodne (Jaccard 0,69--0,85), więc nie
-  są komplementarne. Błąd rekonstrukcji PCA jest od nich niezależny
-  (0,33--0,35), ale słaby (PR-AUC 0,50). Zespół nie ma tu z czego zyskać --
-  dodanie słabego, niezależnego detektora tylko szkodzi.
-  \item \textbf{Ionosphere}: wszystkie detektory są dobre (PR-AUC
-  0,85--0,93) i umiarkowanie zgodne (0,56--0,75). To jedyny zbiór, na którym
-  wszystkie warianty fuzji poprawiają wynik najlepszego detektora:
-  wspólne trafienia się sumują, a indywidualne błędy wzajemnie znoszą.
-  \item \textbf{Parkinsons}: detektory niemal się nie zgadzają (0,13--0,26),
-  bo każdy z nich jest słaby (PR-AUC 0,24--0,34). Niska zgodność nie
-  oznacza tu komplementarności, tylko losowość błędów.
-  \item \textbf{Zbiór syntetyczny}: IForest i błąd rekonstrukcji PCA są
-  niemal identyczne (Jaccard 0,99 -- oba wykrywają anomalie globalne
-  i podprzestrzenne), a LOF jako jedyny wykrywa anomalie lokalne. Detektory
-  \emph{są} komplementarne, ale tak, że głos LOF w sprawie anomalii
-  lokalnych zostaje przegłosowany przez trzy pozostałe.
+  \item \textbf{WDBC}: LOF i OCSVM działają na tej samej, jednej składowej PCA
+  i są praktycznie identyczne (Jaccard 0,95), więc nie są komplementarne.
+  IForest i rekonstrukcja PCA są od nich bardziej niezależne (0,28--0,57),
+  ale słabsze. Zespół nie ma tu z czego zyskać -- dodanie słabszych,
+  niezależnych detektorów tylko szkodzi.
+  \item \textbf{Arrhythmia}: IForest, LOF i OCSVM są podobnej jakości
+  (PR-AUC 0,57--0,60) i umiarkowanie zgodne (0,61--0,66). Uśrednienie
+  zmniejsza wariancję -- CBF w połowie podziałów uśrednia wszystkie trzy.
+  \item \textbf{Campaign}: detektory prawie się nie zgadzają (IForest--LOF
+  0,07), a wszystkie są słabe (0,20--0,30). Niska zgodność oznacza tu
+  w dużej mierze losowość błędów, ale także różne podzbiory wykrywanych
+  anomalii: 24\,\% anomalii wskazuje dokładnie jeden detektor.
+  \item \textbf{Cardio}: OCSVM na UMAP wyraźnie dominuje (0,84 wobec
+  0,47--0,59), a jego decyzje mało pokrywają się z pozostałymi (0,32--0,42),
+  bo działa w innej reprezentacji. Pozostałe detektory, choć słabsze, niosą
+  informację, której OCSVM nie ma -- stąd zysk fuzji ważonej.
 \end{itemize}
 
 Rysunek~\ref{fig:comp} zestawia miary komplementarności z zyskiem zespołu
-na poziomie pojedynczych podziałów. Korelacje są słabe (|$r$| $\le$ 0,34):
-przy 4--16 anomaliach w części testowej zysk w pojedynczym podziale jest
-silnie zaszumiony. Jedyny wyraźny wzorzec widać na poziomie zbiorów.
-Ionosphere ma najmniejszą przewagę najlepszego detektora na walidacji
-(0,065 PR-AUC wobec 0,18--0,21 na pozostałych zbiorach) i jako jedyny
-zyskuje na fuzji.
+na poziomie pojedynczych podziałów. Korelacje są słabe (|$r$| $\le$ 0,38):
+zysk w pojedynczym podziale jest silnie zaszumiony, szczególnie na WDBC.
+Najwyraźniejszy jest związek z udziałem anomalii wykrytych przez dokładnie
+jeden detektor ($r=0{,}38$). Gdy detektory wykrywają różne anomalie,
+uśrednianie ma co łączyć.
 
 \begin{figure}[H]
   \centering
@@ -323,8 +335,8 @@ detektorów $\times$ 2 kryteria progu.
   \caption{Ablacja fuzji wyników (normalizacja dopasowana na walidacji):
   średnia PR-AUC i F1 z 4 zbiorów (test) oraz różnica względem najlepszego
   pojedynczego detektora ($\Delta$); F1 dla progu z walidacyjnego F1 i dla
-  progu z contamination; ,,Wygrane'' -- liczba zbiorów, na których fuzja
-  ma wyższą PR-AUC niż najlepszy pojedynczy detektor.}
+  progu z udziału anomalii ($c$); ,,Wygrane'' -- liczba zbiorów, na których
+  fuzja ma wyższą PR-AUC niż najlepszy pojedynczy detektor.}
   \label{tab:abl}
   \resizebox{\textwidth}{!}{\tab{ablation}}
 \end{table}
@@ -339,27 +351,25 @@ detektorów $\times$ 2 kryteria progu.
 \end{figure}
 
 \begin{itemize}
-  \item \textbf{Normalizacja}: min-max, z-score i odporny z-score dają
-  zbliżoną PR-AUC (różnice do 0,01), a rangi są we wszystkich schematach
-  najgorsze (o ok. 0,01--0,02). W F1 przy fuzji wszystkich detektorów
-  najlepszy jest odporny z-score (0,656--0,672 wobec 0,633--0,659 dla
-  pozostałych). Wyjaśnienie słabości rang: przy 40--125 punktach walidacyjnych
-  dystrybuanta empiryczna jest schodkowa i nasyca się w 1 dla najbardziej
-  skrajnych obserwacji testowych -- dokładnie tam, gdzie PR-AUC jest
-  najbardziej czuła. Min-max i z-score są wrażliwe na pojedyncze skrajne
-  wartości w próbie, do której są dopasowywane.
-  \item \textbf{Wagi}: różnice między schematami są małe (do 0,02),
-  mniejsze niż wpływ normalizacji i wyboru detektorów. Wagi
-  ,,skill $\times$ różnorodność'' są najgorsze, bo premiują słabe detektory.
-  \item \textbf{Wybór detektorów}: zachłanny wybór poprawia średnią PR-AUC
-  (np. rangi, równe wagi: 0,710 $\to$ 0,725), bo usuwa słabe detektory
-  (błąd rekonstrukcji na Breast Cancer). Jednocześnie obniża F1 i nigdy nie
-  wygrywa z najlepszym detektorem na więcej niż 2 zbiorach -- dopasowuje się
-  do szumu małej walidacji.
-  \item \textbf{Próg}: próg z walidacyjnego F1 i z contamination dają
-  podobne średnie F1 (0,61--0,67). Próg z contamination jest stabilniejszy,
-  gdy walidacja ma bardzo mało anomalii, a próg z F1 lepiej dopasowuje się
-  do zbioru, gdy anomalii jest więcej.
+  \item \textbf{Wybór detektorów} ma największy wpływ. Fuzja
+  \emph{wszystkich} detektorów jest zwykle gorsza od najlepszego
+  pojedynczego (do $-0{,}068$), a zachłanny wybór daje zysk przy min-max,
+  z-score i odpornym z-score (+0,010 do +0,021) i wygrywa na 2--3 z 4 zbiorów.
+  Przyczyną jest słaby detektor -- rekonstrukcja PCA (0,26--0,47) -- który
+  w średniej wszystkich detektorów obniża wynik, a zachłanny wybór go pomija.
+  \item \textbf{Normalizacja}: przy wyborze zachłannym min-max jest najlepszy
+  (+0,016 do +0,021), a rangi najgorsze. Przy fuzji wszystkich detektorów
+  odporny z-score wypada najgorzej ($-0{,}042$ do $-0{,}068$): nie ogranicza
+  wartości z góry, więc pojedyncze ekstremalne wyniki słabego detektora
+  dominują w średniej. Min-max i rangi ograniczają wkład każdego detektora
+  do $[0,1]$. Rangi przy kilkuset punktach walidacyjnych są schodkowe
+  i nasycają się w 1 dla najbardziej skrajnych obserwacji testowych --
+  dokładnie tam, gdzie PR-AUC jest najbardziej czuła.
+  \item \textbf{Wagi}: różnice między schematami są małe (do 0,03), mniejsze
+  niż wpływ wyboru detektorów. Przy fuzji wszystkich detektorów równe wagi
+  są najgorsze, bo słaby detektor dostaje tyle samo co dobre.
+  \item \textbf{Próg}: próg z walidacyjnego F1 daje średnio nieco wyższe F1
+  (0,57--0,62) niż próg z udziału anomalii (0,56--0,61).
 \end{itemize}
 
 \subsection{Wagi i wybór detektorów w wariantach własnych}
@@ -367,20 +377,22 @@ detektorów $\times$ 2 kryteria progu.
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth]{\fig{weights}}
-  \caption{Średnie wagi detektorów (10 podziałów) w fuzji z wagami skill,
-  w DSF i w CBF.}
+  \caption{Średnie wagi detektorów (wszystkie podziały projektowe) w fuzji
+  z wagami skill, w DSF i w CBF.}
   \label{fig:weights}
 \end{figure}
 
 Rysunek~\ref{fig:weights} pokazuje różnicę między wariantami. Wagi skill
-rozkładają się na wszystkie detektory, także słabe (rekonstrukcja PCA na
-Breast Cancer). DSF dzięki zachłannemu wyborowi często zostawia jeden lub
-dwa detektory, ale ich wybór zmienia się między podziałami. CBF na zbiorze
-syntetycznym we wszystkich 10 podziałach wybiera wyłącznie LOF (jego
-przewaga jest istotna), na Breast Cancer -- LOF i OCSVM (w 5 podziałach)
-lub te dwa z IForest, na Ionosphere -- najczęściej wszystkie cztery
-(8 z 10 podziałów). Wybory CBF są zgodne z intuicją: odrzuca dokładnie te
-detektory, które w tabeli~\ref{tab:main} są wyraźnie słabsze.
+rozkładają się na wszystkie detektory, także słabe (rekonstrukcja PCA).
+DSF dzięki zachłannemu wyborowi zostawia zwykle jeden do trzech detektorów.
+Na Cardio łączy OCSVM z innymi (w 8 z 10 podziałów), co daje najlepszy wynik
+na tym zbiorze. Na WDBC zawsze zostawia jeden detektor (LOF w 18, IForest
+w 12 podziałach), czyli wraca do problemu wyboru pojedynczego detektora na
+2--3 anomaliach. CBF na Cardio we wszystkich 10 podziałach wybiera wyłącznie
+OCSVM (przewaga na walidacji jest istotna), na WDBC uśrednia trzy lub cztery
+detektory (bootstrap na 2--3 anomaliach nie odróżnia ich od najlepszego), na
+Arrhythmii najczęściej IForest, LOF i OCSVM, a na Campaign IForest sam lub
+z OCSVM.
 
 \subsection{Przypadki poprawy i pogorszenia}
 \label{sec:fail}
@@ -390,7 +402,7 @@ pojedynczego detektora dla każdej obserwacji testowej.
 
 \begin{table}[H]
   \centering\small
-  \caption{Analiza przypadków (część testowa, suma po 10 podziałach):
+  \caption{Analiza przypadków (część testowa, suma po podziałach projektowych):
   anomalie wykryte przez zespół, a pominięte przez najlepszy pojedynczy
   detektor (,,uratowane''), i odwrotnie (,,utracone''), oraz fałszywe alarmy
   usunięte i dodane przez zespół.}
@@ -398,41 +410,37 @@ pojedynczego detektora dla każdej obserwacji testowej.
   \resizebox{\textwidth}{!}{\tab{cases}}
 \end{table}
 
-\paragraph{Kiedy zespół pomaga.} Na Ionosphere fuzja średnia i CBF
-,,ratują'' 6 anomalii, tracąc tylko 2, i usuwają 5--6 z 10 fałszywych
-alarmów. Detektory są tam porównywalnie dobre i ich błędy są w dużej mierze
-indywidualne. Uśrednienie zmniejsza wariancję wyniku, co jest klasycznym
-mechanizmem działania zespołów. MV 2/4 ratuje 7 anomalii bez żadnej
-straty.
+\paragraph{Kiedy zespół pomaga.} Na Cardio DSF traci 37 anomalii, ratuje 23,
+ale usuwa 57 z 88 fałszywych alarmów najlepszego detektora, dodając tylko
+15. Precision rośnie z 0,81 do 0,89, a F1 z 0,79 do 0,81. Słabsze detektory
+,,potwierdzają'' wysokie wyniki OCSVM tylko dla prawdziwych anomalii.
+Na Arrhythmii CBF usuwa 33 z 89 fałszywych alarmów, dodając 13. Detektory są
+tam porównywalnie dobre, a ich błędy w dużej mierze indywidualne, więc
+uśrednienie zmniejsza wariancję wyniku -- klasyczny mechanizm działania
+zespołów.
 
-\paragraph{Kiedy zespół szkodzi.} Na zbiorze syntetycznym fuzja średnia traci
-57 anomalii (Recall anomalii lokalnych spada z 0,66 do 0,02), a MV 3/4 --
-52. Mechanizm to \emph{rozmycie unikalnej informacji}: anomalie lokalne
-wykrywa wyłącznie LOF, a trzy pozostałe detektory oceniają je jako
-normalne. W średniej wysoki wynik LOF zostaje rozcieńczony do poziomu
-obserwacji normalnych, a w głosowaniu -- przegłosowany. Komplementarność,
-która miała być zaletą zespołu, staje się jego wadą, gdy agregacja
-traktuje odosobniony głos jako błąd. Na Breast Cancer fuzja średnia dodaje
-22 fałszywe alarmy, bo do trzech zgodnych, dobrych detektorów dochodzi
-słaby, niezależny (rekonstrukcja PCA), którego błędy przesuwają wyniki
-obserwacji normalnych.
+\paragraph{Kiedy zespół szkodzi.} Na WDBC fuzja średnia traci 15 z 79
+anomalii, ratując 4. Mechanizm to \emph{rozmycie dobrego sygnału}: LOF
+i OCSVM na pierwszej składowej PCA prawie bezbłędnie oddzielają guzy
+złośliwe, a IForest i rekonstrukcja dodają do średniej szum, który przesuwa
+część anomalii poniżej progu. Na Campaign MV 2/4 i fuzja średnia ratują
+ok. 1400--1500 anomalii, ale dodają 4900--5800 fałszywych alarmów. Przy
+11\,\% anomalii i słabych detektorach suma sygnałów obniża precyzję
+(0,28--0,30) i fuzja średnia ma niższą PR-AUC niż najlepszy pojedynczy
+detektor.
 
-\paragraph{Dlaczego DSF zawiodło.} DSF traci mało anomalii, ale też prawie
-nic nie zyskuje. Na Ionosphere jego PR-AUC (0,859) jest niższa od fuzji
-średniej (0,908): zachłanny wybór dopasowany do walidacji z 6 anomaliami
-zostawia jeden lub dwa detektory i traci korzyść z uśredniania. Człon
-różnorodności $1-\bar\rho_k$ zwiększa wagi detektorów słabych, bo słaby
-detektor jest mało skorelowany z dobrymi. Normalizacja rangowa nasyca się
-dla skrajnych punktów testowych. Te trzy obserwacje doprowadziły do CBF.
-
-\paragraph{Dlaczego CBF zawodzi na Parkinsons.} Część walidacyjna zawiera
-4 anomalie, więc bootstrap PR-AUC ma ogromną wariancję i zbiór
-,,kompetentnych'' detektorów zmienia się między podziałami (7 różnych
-kombinacji w 10 podziałach). Co więcej, detektory bazowe na Parkinsons
-działają na UMAP wybranym przez przeuczenie w zadaniu~2. Przy tak małej
-walidacji żadna metoda doboru wag nie ma wystarczającej informacji
-i najbezpieczniejsza jest zwykła średnia (0,352, jedna z najwyższych PR-AUC
-na tym zbiorze).
+\paragraph{DSF a CBF.} Oba warianty własne mają niemal taką samą średnią
+(PR-AUC 0,651 i 0,652), ale wygrywają w innych sytuacjach. DSF jest lepszy,
+gdy walidacja jest duża, a słabsze detektory niosą informację uzupełniającą
+(Cardio: 0,872 wobec 0,836; Campaign: 0,328 wobec 0,320). Zachłanny wybór
+ma wtedy wiarygodną podstawę. CBF jest lepszy, gdy walidacja jest bardzo
+mała (WDBC: 0,851 wobec 0,803). DSF dopasowuje tam skład zespołu do 2--3
+anomalii i często wybiera gorszy detektor, a CBF w takiej sytuacji
+uśrednia, bo nie ma podstaw, by odrzucić którykolwiek z dobrych
+detektorów. Na Cardio konserwatyzm CBF jest wadą: istotna przewaga OCSVM
+na walidacji sprawia, że odrzuca pozostałe detektory, choć w połączeniu
+z OCSVM poprawiłyby wynik. Kryterium ,,czy detektor jest równie dobry
+sam'' nie mierzy tego, czy jest użyteczny \emph{w zespole}.
 
 \subsection{Test potwierdzający na nowych podziałach}
 \label{sec:confirm}
@@ -440,39 +448,38 @@ na tym zbiorze).
 \begin{table}[H]
   \centering\small
   \caption{Średnie PR-AUC i F1 (4 zbiory, część testowa) na podziałach
-  użytych przy projektowaniu (ziarna 0--9) i na nowych podziałach
-  (ziarna 10--19); ,,Lepszy niż najl.'' -- liczba zbiorów, na których
-  PR-AUC wariantu jest wyższa niż najlepszego pojedynczego detektora.}
+  projektowych (,,projekt.'') i na nowych podziałach (,,potw.'');
+  ,,Lepszy niż najl.'' -- liczba zbiorów, na których PR-AUC wariantu jest
+  wyższa niż najlepszego pojedynczego detektora.}
   \label{tab:confirm}
   \resizebox{\textwidth}{!}{\tab{confirmation}}
 \end{table}
 
-Na nowych podziałach (tabela~\ref{tab:confirm}) potwierdza się, że CBF jest
-najlepszym wariantem zespołowym: PR-AUC 0,772, F1 0,671. Wyprzedza fuzję
-średnią (0,716; 0,626), wagi skill (0,736; 0,646) i MV 2/4 (0,658; 0,629),
-a w PR-AUC jest wyższy od najlepszego pojedynczego detektora na 2 z 4
-zbiorów. Średnio jednak \textbf{nadal nie przewyższa najlepszego
-pojedynczego detektora} (0,794; 0,678), głównie z powodu Parkinsons
-(0,358 wobec 0,473). Przewaga MV 2/4 w F1 z ziaren 0--9 (0,680 wobec
-0,659) \textbf{nie potwierdziła się} (0,629 wobec 0,678). Był to efekt
-konkretnych podziałów, a nie stała właściwość metody. DSF na nowych
-podziałach wypada lepiej (0,773), ale wciąż przegrywa z najlepszym
-detektorem na wszystkich zbiorach. Test potwierdzający pokazuje, jak
-łatwo przy 10 podziałach małych zbiorów uznać przypadkową różnicę za
-efekt metody.
+Na nowych podziałach (tabela~\ref{tab:confirm}) CBF ma najwyższą średnią
+PR-AUC (0,628 wobec 0,620 najlepszego pojedynczego, 0,621 DSF i 0,620
+wag skill). DSF i CBF przewyższają najlepszy pojedynczy detektor na 2 z 4
+zbiorów i mają wyższe średnie F1 (0,580 i 0,579 wobec 0,565). Kierunek
+efektów jest taki sam jak na podziałach projektowych: DSF wygrywa na Cardio
+(0,851 wobec 0,801) i Campaign (0,334 wobec 0,309), CBF na WDBC (0,828
+wobec 0,815) i Campaign (0,333). Fuzja średnia i MV 2/4 pozostają poniżej
+najlepszego pojedynczego detektora w PR-AUC. Różnice średnich między
+wariantami (0,01) są jednak mniejsze od odchyleń między podziałami na
+Arrhythmii i WDBC (0,13--0,20). Wniosek ,,zespół jest średnio co najmniej
+tak dobry jak najlepszy pojedynczy detektor'' jest potwierdzony, wniosek
+,,jest lepszy'' -- tylko dla konkretnych zbiorów.
 
 \subsection{Porównanie z zadaniami 1 i 2}
 
 Tabela~\ref{tab:ladder} przedstawia PR-AUC uzyskaną na kolejnych etapach
-projektu na tych samych podziałach (ziarna 0--9). Każdy wybór dokonywany
-jest na walidacji.
+projektu na tych samych podziałach. Każdy wybór dokonywany jest na
+walidacji.
 
 \begin{table}[H]
   \centering\small
   \caption{PR-AUC (test) na kolejnych etapach projektu: domyślny Isolation
-  Forest w danych oryginalnych, wybór algorytmu (zad.~1 i 2), wybór
-  reprezentacji i algorytmu (zad.~2), najlepszy pojedynczy detektor bazowy
-  oraz zespoły (zad.~3).}
+  Forest w danych oryginalnych, wybór algorytmu w danych oryginalnych
+  (zad.~2), wybór reprezentacji i algorytmu (zad.~2), najlepszy pojedynczy
+  detektor bazowy oraz zespoły (zad.~3).}
   \label{tab:ladder}
   \resizebox{\textwidth}{!}{\tab{synthesis_ladder}}
 \end{table}
@@ -480,18 +487,18 @@ jest na walidacji.
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth]{\fig{synthesis_ladder}}
-  \caption{PR-AUC (test) na kolejnych etapach trzech zadań.}
+  \caption{PR-AUC (test) na kolejnych etapach zadań 2 i 3.}
   \label{fig:ladder}
 \end{figure}
 
-Największy skok jakości daje \textbf{wybór algorytmu} w zadaniu~1: średnia
-PR-AUC rośnie z 0,548 (domyślny Isolation Forest) do 0,730. Wybór
-reprezentacji w zadaniu~2 dodaje średnio ok. 0,03 (0,719 $\to$ 0,748),
-ale nierówno. Duży zysk daje na Breast Cancer (0,68 $\to$ 0,84,
-PCA z jedną składową), a na Parkinsons strata (0,37 $\to$ 0,30), bo
-walidacja wybrała przeuczony UMAP. Zespół (zadanie~3) nie poprawia
-średniej (CBF 0,741, fuzja średnia 0,710 wobec 0,750). Poprawia tylko
-Ionosphere (0,922 wobec 0,898).
+Na zbiorach zadań 2 i 3 największy skok jakości daje \textbf{wybór
+reprezentacji}: średnia PR-AUC rośnie z 0,544 do 0,663. Zysk pochodzi
+głównie z Cardio (UMAP + OCSVM: 0,60 $\to$ 0,84) i WDBC (PCA: 0,71 $\to$
+0,92). \textbf{Wybór algorytmu} w danych oryginalnych spośród trzech
+detektorów nic tu nie daje (0,556 $\to$ 0,544). Isolation Forest jest
+na tych zbiorach mocnym punktem wyjścia, a na WDBC walidacja wybiera
+słabszy LOF. Zespół (zadanie~3) utrzymuje poziom najlepszego pojedynczego
+detektora (CBF 0,652 wobec 0,654), a zwykła średnia go obniża (0,622).
 
 \section{Synteza: co miało największy wpływ na jakość detekcji?}
 \label{sec:synthesis}
@@ -503,85 +510,86 @@ z zespołu przy wyborze na walidacji.
 
 \begin{table}[H]
   \centering\small
-  \caption{Wpływ czynników na PR-AUC (test): rozrzut między algorytmami
-  (5 metod z zad.~1; 3 detektory w danych oryginalnych z zad.~2), średni
-  rozrzut jednego detektora między reprezentacjami (zad.~2) oraz zysk
-  zespołu względem najlepszego pojedynczego detektora wybranego na
-  walidacji (zad.~3).}
+  \caption{Wpływ czynników na PR-AUC (test): rozrzut między 3 detektorami
+  w danych oryginalnych (zad.~2), średni rozrzut jednego detektora między
+  reprezentacjami (zad.~2) oraz zysk zespołu względem najlepszego
+  pojedynczego detektora wybranego na walidacji (zad.~3).}
   \label{tab:effects}
-  \resizebox{\textwidth}{!}{\tab{synthesis_effects}}
+  \resizebox{0.85\textwidth}{!}{\tab{synthesis_effects}}
 \end{table}
+
+Wybór algorytmu badano też w zadaniu~1 na pięciu innych zbiorach
+z szerszą siatką pięciu metod. Tam rozrzut PR-AUC między metodami był
+największy ze wszystkich czynników: średnio 0,40, na Breastw 0,64, na Wine
+0,61, na Cardio 0,56. Zrealizowany zysk z wyboru metody na walidacji
+względem domyślnego Isolation Forest wyniósł średnio +0,15 (0,511 $\to$
+0,658), w tym Wine +0,51 (OCSVM) i Cardio +0,16 (OCSVM).
 
 \paragraph{Odpowiedź.} Na podstawie wyników trzech zadań:
 \begin{enumerate}
-  \item \textbf{Największy zrealizowany wpływ ma wybór algorytmu.}
-  Dopasowanie mechanizmu detektora do typu wyjątków podnosi średnią PR-AUC
-  o 0,18 (0,548 $\to$ 0,730). Rozrzut między algorytmami na tym samym zbiorze
-  wynosi średnio 0,21 (do 0,29 na zbiorze syntetycznym, gdzie występują
-  wyjątki lokalne widoczne tylko dla LOF). Kluczowa jest zgodność
-  mechanizmu metody z naturą anomalii: lokalne -- LOF, globalne
-  i rozproszone -- OCSVM, rekonstrukcja, IForest.
-  \item \textbf{Reprezentacja ma największy rozrzut (średnio 0,31), ale
-  głównie w dół.} Zła reprezentacja (UMAP) potrafi zniszczyć detekcję
-  (Ionosphere: IForest 0,89 $\to$ 0,14), a dobra (PCA) daje istotną poprawę
-  tylko na części zbiorów (Breast Cancer +0,16, Isolation Forest wszędzie).
-  Zrealizowany zysk przy wyborze na walidacji to średnio ok. 0,03, a wybór
-  spośród wielu wariantów reprezentacji na małej walidacji łatwo się
-  przeucza (Parkinsons).
-  \item \textbf{Połączenie detektorów ma najmniejszy wpływ.} Najlepszy
-  wariant (CBF) zmienia średnią PR-AUC o $-0{,}01$ (na nowych podziałach
-  $-0{,}02$), a zwykła średnia o $-0{,}04$. Zespół pomaga tylko wtedy, gdy
-  detektory są porównywalnie dobre i popełniają różne błędy (Ionosphere).
-  Zespół źle zaprojektowany potrafi zaszkodzić bardziej, niż dobrze
-  zaprojektowany pomaga (fuzja średnia na zbiorze syntetycznym: $-0{,}12$).
+  \item \textbf{Wybór algorytmu i reprezentacji mają porównywalny,
+  największy wpływ -- ale nie da się ich rozdzielić.} W zadaniu~1 wybór
+  metody podniósł średnią PR-AUC o 0,15, a w zadaniu~2 wybór reprezentacji
+  (łącznie z algorytmem w niej) o 0,12. Oba efekty są skupione na kilku
+  zbiorach (Wine, Cardio, WDBC), a w obu przypadkach kluczowa jest
+  \emph{para}: ta sama reprezentacja pomaga jednemu detektorowi i szkodzi
+  innemu (UMAP: OCSVM na Cardio +0,24, LOF $-0{,}07$), a ten sam algorytm
+  zmienia ranking w zależności od reprezentacji. Detektor to w praktyce
+  para reprezentacja--algorytm.
+  \item \textbf{Reprezentacja ma duży rozrzut (średnio 0,19), w obie strony.}
+  PCA z jedną składową daje na WDBC +0,21 dla LOF, UMAP z OCSVM na Cardio
+  +0,24, a UMAP z IForest na Arrhythmii $-0{,}26$. Wybór na walidacji
+  przenosi się na test tam, gdzie walidacja ma dość anomalii.
+  \item \textbf{Połączenie detektorów ma najmniejszy wpływ.} Najlepsze
+  warianty (CBF, DSF) zmieniają średnią PR-AUC o ok. 0,00 (na nowych
+  podziałach $+0{,}01$), a zwykła średnia o $-0{,}03$. Zespół pomaga, gdy
+  detektory wnoszą różne informacje, a walidacja pozwala to ocenić (Cardio,
+  Arrhythmia, Campaign: +0,01 do +0,04), i szkodzi, gdy dobry sygnał
+  zostaje rozmyty słabszymi detektorami (WDBC: do $-0{,}10$).
   \item Ponad wszystkimi trzema czynnikami stoi \textbf{natura danych}:
-  rozrzut PR-AUC między zbiorami (0,38--0,93 dla najlepszej metody) jest
-  większy niż efekt któregokolwiek wyboru. Na Parkinsons, gdzie
-  ,,anomalie'' nie są wyjątkami statystycznymi, nie pomógł ani algorytm,
-  ani reprezentacja, ani zespół.
+  rozrzut PR-AUC między zbiorami (0,33--0,93 dla najlepszej metody) jest
+  większy niż efekt któregokolwiek wyboru. Na Campaign, gdzie ,,anomalie''
+  (klienci zakładający lokatę) nie są wyjątkami statystycznymi, ani
+  algorytm, ani reprezentacja, ani zespół nie podniosły PR-AUC powyżej 0,34
+  przy bazowym 0,11.
 \end{enumerate}
 
 \section{Rekomendacje: kiedy zespół, a kiedy pojedynczy detektor}
 
 \begin{itemize}
-  \item \textbf{Pojedynczy detektor}, gdy walidacja wyraźnie wskazuje
-  zwycięzcę (przewaga istotna w bootstrapie, jak LOF na zbiorze
-  syntetycznym) lub gdy jeden detektor jako jedyny wykrywa pewien typ
-  anomalii. Uśrednianie rozmyje wtedy jego unikalny sygnał.
-  \item \textbf{Zespół (średnia lub CBF)}, gdy kilka detektorów o różnych
-  mechanizmach ma porównywalną jakość, a ich błędy są w dużej mierze
-  indywidualne (Ionosphere). Uśrednianie obniża wtedy wariancję i liczbę
-  fałszywych alarmów.
-  \item \textbf{Majority Voting z progiem 2/4}, gdy priorytetem jest
-  stabilna decyzja binarna, a nie ranking. Wyższe progi tylko przy bardzo
-  wysokim koszcie fałszywego alarmu.
-  \item \textbf{Nie stosować} fuzji przez maksimum ani wag nagradzających
-  różnorodność bez kontroli jakości. Normalizację dopasowywać na wynikach
+  \item \textbf{Pojedynczy detektor}, gdy jeden detektor wyraźnie dominuje
+  i ma unikalną wiedzę, a pozostałe są słabe i z nim skorelowane, albo gdy
+  walidacja jest zbyt mała, by ocenić detektory (WDBC). Uśrednianie rozmyje
+  wtedy dobry sygnał.
+  \item \textbf{Fuzja z zachłannym wyborem (DSF, wagi skill)}, gdy walidacja
+  ma dziesiątki anomalii, a detektory działają w różnych reprezentacjach
+  i wykrywają różne anomalie (Cardio, Campaign).
+  \item \textbf{CBF}, gdy walidacja jest mała lub nie wiadomo, czy zespół
+  pomoże. Z konstrukcji sprowadza się do najlepszego detektora, gdy ten
+  wyraźnie dominuje, i do średniej, gdy detektory są nieodróżnialne. Na nowych
+  podziałach miał najwyższą średnią PR-AUC.
+  \item \textbf{Majority Voting z progiem 2/4 lub 3/4}, gdy priorytetem jest
+  stabilna decyzja binarna, a nie ranking (najwyższe F1 na Campaign).
+  \item \textbf{Nie stosować} fuzji przez maksimum ani średniej wszystkich
+  detektorów bez kontroli jakości. Normalizację dopasowywać na wynikach
   \emph{out-of-sample} (walidacja), a nie na wynikach części uczącej.
-  \item \textbf{Bardzo mała walidacja} (kilka anomalii): unikać ciągłych
-  wag i zachłannego wyboru. Najbezpieczniejsza jest prosta średnia lub
-  pojedynczy, sprawdzony detektor.
-  \item \textbf{CBF} jest rozsądnym wyborem domyślnym, gdy nie wiadomo,
-  czy zespół pomoże. Z konstrukcji sprowadza się do najlepszego detektora,
-  gdy ten wyraźnie dominuje, i do średniej, gdy detektory są
-  nieodróżnialne. W teście potwierdzającym był najlepszym wariantem
-  zespołowym.
 \end{itemize}
 
 \section{Ograniczenia}
 
 \begin{itemize}
-  \item Małe zbiory (4--16 anomalii w części walidacyjnej) ograniczają
-  wiarygodność każdej metody doboru wag i progów. Pokazał to test
-  potwierdzający (różnica wyników MV 2/4 między ziarnami 0--9 i 10--19).
-  \item CBF zaprojektowano po obejrzeniu wyników testowych dla ziaren 0--9.
-  Test na ziarnach 10--19 częściowo usuwa ten problem, ale zbiory danych
-  i detektory bazowe pozostały te same.
-  \item Detektory bazowe przejęto z zadania~2 razem z jego błędami wyboru
-  (UMAP na Parkinsons).
+  \item Części walidacyjne WDBC zawierają 2--3 anomalie, co ogranicza
+  wiarygodność każdej metody doboru wag i progów, a nawet wyboru
+  pojedynczego detektora. Trzydzieści podziałów zmniejsza niepewność
+  średniej, ale nie poprawia decyzji w pojedynczym podziale.
+  \item Dla Campaign użyto 5 podziałów projektowych i 5 potwierdzających
+  (koszt obliczeń). Odchylenia między podziałami są tam małe (0,01--0,03).
+  \item Detektory bazowe przejęto z zadania~2 razem z jego decyzjami. Na
+  WDBC LOF i OCSVM są niemal identyczne, więc zespół ma de facto trzy różne
+  detektory.
   \item Zbadano zespoły heterogeniczne złożone z 4 detektorów. Nie badano
   zespołów jednorodnych (np. wielu LOF o różnych $k$) ani uczenia
-  meta-modelu (stacking) na walidacji, który przy tak małych zbiorach
+  meta-modelu (stacking) na walidacji, który przy małych walidacjach
   byłby silnie przeuczony.
 \end{itemize}
 
@@ -589,23 +597,24 @@ z zespołu przy wyborze na walidacji.
 
 \begin{enumerate}
   \item Zespół detektorów nie jest automatycznie lepszy od najlepszego
-  detektora. W tym projekcie żaden wariant zespołowy nie przewyższył go
-  średnio, choć na Ionosphere zespoły wygrywały wyraźnie (CBF: PR-AUC
-  0,922 wobec 0,898, F1 0,869 wobec 0,790).
+  detektora. Najlepsze warianty (DSF, CBF) są średnio tak samo dobre jak
+  najlepszy pojedynczy detektor wybrany na walidacji. Wygrywają na Cardio,
+  Arrhythmii i Campaign (o 0,01--0,04 PR-AUC), a przegrywają na WDBC.
   \item O efekcie zespołu decyduje relacja między jakością
-  a komplementarnością detektorów. Komplementarność pomaga, gdy błędy są
-  indywidualne, a szkodzi, gdy unikalną wiedzę ma jeden detektor
-  (anomalie lokalne -- LOF) i agregacja ją przegłosowuje.
-  \item Normalizacja wyników jest ważniejsza niż schemat wag. Wyniki
-  in-sample są przesunięte względem wyników nowych danych, a normalizacja
-  rangowa dopasowana na nich niszczy ranking (maksimum: 0,415 $\to$ 0,645
-  po dopasowaniu na walidacji).
-  \item Własny wariant CBF (bootstrapowy wybór detektorów kompetentnych
-  i równe wagi) okazał się najlepszym i najbardziej stabilnym wariantem
-  zespołowym w obu seriach podziałów. Zawodzi tylko tam, gdzie walidacja
-  jest zbyt mała, by ocenić kompetencję detektorów.
+  a komplementarnością detektorów oraz wielkość walidacji. Komplementarność
+  pomaga, gdy słabsze detektory potwierdzają trafienia dobrego, a szkodzi,
+  gdy rozmywają jego prawie bezbłędny sygnał (WDBC).
+  \item Wybór detektorów do zespołu jest ważniejszy niż schemat wag,
+  a normalizację trzeba dopasować na wynikach out-of-sample. Wyniki
+  in-sample są przesunięte (Campaign: 71\,\% wyników testowych OCSVM powyżej
+  maksimum wyników uczących), a fuzja przez maksimum z rangami dopasowanymi
+  na nich traci 0,11 PR-AUC.
+  \item Własne warianty DSF i CBF realizują przeciwne strategie (zaufanie
+  walidacji i ostrożność wobec niej) i sprawdzają się w różnych warunkach:
+  DSF przy dużej walidacji, CBF przy małej. CBF miał najwyższą średnią
+  PR-AUC w teście potwierdzającym.
   \item W skali całego projektu o jakości detekcji decydowały kolejno:
-  natura danych, wybór algorytmu, reprezentacja i dopiero na końcu
+  natura danych, dobór pary algorytm--reprezentacja i dopiero na końcu
   połączenie detektorów.
 \end{enumerate}
 
@@ -614,9 +623,11 @@ z zespołu przy wyborze na walidacji.
 \begin{verbatim}
 python -m task3_ensemble.run_base                    # wymaga wyników zad. 2
 python -m task3_ensemble.run_ensembles
-python -m task3_ensemble.run_base --confirm          # ziarna 10-19
+python -m task3_ensemble.run_base --confirm          # nowe ziarna
 python -m task3_ensemble.run_ensembles --confirm
 python -m task3_ensemble.analyze
 \end{verbatim}
+
+\input{../common/references}
 
 \end{document}

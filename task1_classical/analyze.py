@@ -226,17 +226,19 @@ def fig_ocsvm(grid):
     axes[0].set_ylabel("$\\nu$")
     save(fig, FIG / "ocsvm_rbf_heatmap")
 
-    # (b) best PR-AUC reachable with every kernel
+    # (b) every kernel with nu and gamma chosen on validation data
     fig, ax = plt.subplots(figsize=(8, 2.7))
     kernels = ["rbf", "poly", "sigmoid", "linear"]
     shades = [BLUES(v) for v in (0.85, 0.6, 0.4, 0.2)]
     width = 0.2
     for i, k in enumerate(kernels):
-        vals = [sub[(sub.dataset == d) & (sub.kernel == k)].groupby("params")
-                .test_pr_auc.mean().max() for d in TASK1_DATASETS]
+        vals = []
+        for d in TASK1_DATASETS:
+            g = sub[(sub.dataset == d) & (sub.kernel == k)].groupby("params")
+            vals.append(g.test_pr_auc.mean()[g.val_pr_auc.mean().idxmax()])
         ax.bar(np.arange(5) + (i - 1.5) * width, vals, width * 0.92, color=shades[i], label=k)
     ax.set_xticks(range(5), NAMES)
-    ax.set_ylabel("maks. PR-AUC (test)")
+    ax.set_ylabel("PR-AUC (test)")
     ax.legend(ncol=4, loc="upper center", bbox_to_anchor=(0.5, 1.18))
     save(fig, FIG / "ocsvm_kernels")
 

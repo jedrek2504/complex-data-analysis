@@ -58,5 +58,6 @@ def setup():
 
 def save(fig, path):
     path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path.with_suffix(".pdf"))
+    # no creation date: re-running a script does not change unchanged figures
+    fig.savefig(path.with_suffix(".pdf"), metadata={"CreationDate": None})
     plt.close(fig)

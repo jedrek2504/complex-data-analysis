@@ -7,7 +7,8 @@ def num(x, digits=3):
     """Format a number with a decimal comma (Polish convention)."""
     if x is None or (isinstance(x, float) and np.isnan(x)):
         return "--"
-    return f"{x:.{digits}f}".replace(".", ",")
+    text = f"{x:.{digits}f}".replace(".", ",")
+    return "$-$" + text[1:] if text.startswith("-") else text
 
 
 def pm(mean, std, digits=3):

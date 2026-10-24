@@ -113,12 +113,14 @@ class AutoencoderRep(Representation):
 
     Trained on the training part with MSE loss (Adam, weight decay); 15 % of
     the training rows are held out for early stopping, so no labels and no
-    validation/test rows are used during training.
+    validation/test rows are used during training. The mini-batch has 32 rows,
+    or more for large datasets so that an epoch has at most 64 updates
+    (Campaign: 274 rows), which keeps the training time manageable.
     """
 
     native_score = True
 
-    def __init__(self, latent_dim=8, hidden=(64, 32), epochs=400, batch_size=32,
+    def __init__(self, latent_dim=8, hidden=(64, 32), epochs=400, batch_size=None,
                  lr=1e-3, weight_decay=1e-5, patience=30, seed=0, device=None):
         self.latent_dim, self.hidden = latent_dim, tuple(hidden)
         self.epochs, self.batch_size = epochs, batch_size
@@ -132,6 +134,7 @@ class AutoencoderRep(Representation):
         idx = rng.permutation(len(X))
         n_hold = max(int(0.15 * len(X)), 1)
         X_hold, X_fit = X[idx[:n_hold]].to(self.device), X[idx[n_hold:]].to(self.device)
+        batch_size = self.batch_size or max(32, -(-len(X_fit) // 64))
         self.net = _AENet(X.shape[1], self.latent_dim, self.hidden).to(self.device)
         opt = torch.optim.Adam(self.net.parameters(), lr=self.lr,
                                weight_decay=self.weight_decay)
@@ -141,8 +144,8 @@ class AutoencoderRep(Representation):
             self.net.train()
             perm = torch.randperm(len(X_fit), device=self.device)
             train_loss = 0.0
-            for start in range(0, len(X_fit), self.batch_size):
-                batch = X_fit[perm[start:start + self.batch_size]]
+            for start in range(0, len(X_fit), batch_size):
+                batch = X_fit[perm[start:start + batch_size]]
                 recon, _ = self.net(batch)
                 loss = nn.functional.mse_loss(recon, batch)
                 opt.zero_grad()

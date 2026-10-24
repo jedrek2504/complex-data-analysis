@@ -5,7 +5,7 @@ and detector, the pair (representation parameters, detector parameters) with
 the highest mean validation PR-AUC over the 10 seeds is chosen. Sweeps over
 one representation parameter (e.g. the number of PCA components) choose the
 detector parameters on validation separately for every value of the swept
-parameter.
+parameter. The number of seeds differs between datasets (common/protocol.py).
 """
 
 import json
@@ -15,10 +15,10 @@ import numpy as np
 import pandas as pd
 
 from common import ROOT
-from common.datasets import DISPLAY_NAMES, HIGHDIM_DATASETS
+from common.datasets import DISPLAY_NAMES, TASK2_DATASETS
 from common.latex import num, pm, tabular
-from common.plotting import (ANOMALY_COLOR, BLUES, METHOD_COLORS, NORMAL_COLOR,
-                             TYPE_COLORS, TYPE_LABELS, save, setup)
+from common.plotting import (BLUES, METHOD_COLORS, NORMAL_COLOR, TYPE_COLORS,
+                            TYPE_LABELS, save, setup)
 
 OUT = ROOT / "results" / "task2"
 FIG, TAB = OUT / "figures", OUT / "tables"
@@ -81,7 +81,7 @@ def table_configs(best):
     lines = ["\\begin{longtable}{lllp{2.7cm}rrrrrrr}", "\\toprule",
              "Zbiór & Repr. & Detektor & Konfiguracja & Prec. & Rec. & F1 & ROC & "
              "PR-AUC & $t_{r}$ [ms] & $t_{d}$ [ms] \\\\", "\\midrule", "\\endhead"]
-    for d in HIGHDIM_DATASETS:
+    for d in TASK2_DATASETS:
         sub = best[best.dataset == d]
         top_pr = sub.test_pr_auc.max()
         first = True
@@ -111,19 +111,22 @@ def table_configs(best):
 
 
 def table_task1_comparison(best):
+    """PR-AUC per representation; the gain is measured against the original
+    space with the same (task 2) detector grid. Task 1 results exist only for
+    the datasets shared with task 1 (Cardio)."""
     t1 = pd.read_csv(ROOT / "results" / "task1" / "best_metrics.csv")
     t1 = t1.groupby(["dataset", "method"]).pr_auc.mean()
     rows = []
-    for d in HIGHDIM_DATASETS:
+    for d in TASK2_DATASETS:
         for det in ("IForest", "LOF", "OCSVM"):
             r = {"Zbiór": DISPLAY_NAMES[d] if det == "IForest" else "", "Detektor": det,
-                 "Zad. 1": t1[(d, det)]}
+                 "Zad. 1": t1.get((d, det), np.nan)}
             for rep in REPS:
                 r[REP_LABEL[rep]] = best[(best.dataset == d) & (best.rep == rep)
                                          & (best.detector == det)].test_pr_auc.iloc[0]
             best_rep = max(REPS, key=lambda x: r[REP_LABEL[x]])
             r["Najlepsza repr."] = REP_LABEL[best_rep]
-            r["Zysk"] = r[REP_LABEL[best_rep]] - r["Zad. 1"]
+            r["Zysk"] = r[REP_LABEL[best_rep]] - r[REP_LABEL["Original"]]
             rows.append(r)
     df = pd.DataFrame(rows)
     out = df.copy()
@@ -139,7 +142,7 @@ def table_ae_architecture(runs, structure):
     st = structure[(structure.rep == "AE")
                    & structure.rep_params.str.contains('"latent_dim": 8', regex=False)]
     rows = []
-    for d in HIGHDIM_DATASETS:
+    for d in TASK2_DATASETS:
         for hidden, label in (("[32]", "$d$-32-8"), ("[64, 32]", "$d$-64-32-8"),
                               ("[128, 64]", "$d$-128-64-8")):
             key = f'"hidden": {hidden}'
@@ -158,59 +161,59 @@ def table_ae_architecture(runs, structure):
 
 
 def table_types(best):
-    sub = best[best.dataset == "synthetic"]
+    """Recall of global and local anomalies of the best detector (validation
+    PR-AUC) in every representation."""
     rows = []
-    for rep in REPS:
-        for det in DETECTORS:
-            r = sub[(sub.rep == rep) & (sub.detector == det)]
-            if r.empty:
-                continue
-            r = r.iloc[0]
-            rows.append({"Reprezentacja": REP_LABEL[rep] if det == "IForest" else "",
-                         "Detektor": DET_LABEL[det],
-                         "globalne": r.test_recall_global, "lokalne": r.test_recall_local,
-                         "podprzestrzenne": r.test_recall_subspace, "PR-AUC": r.test_pr_auc})
-    tabular(pd.DataFrame(rows), TAB / "recall_by_type_synthetic.tex", align="llrrrr")
+    for d in TASK2_DATASETS:
+        for i, rep in enumerate(REPS):
+            sub = best[(best.dataset == d) & (best.rep == rep)]
+            r = sub.loc[sub.val_pr_auc.idxmax()]
+            rows.append({"Zbiór": DISPLAY_NAMES[d] if i == 0 else "",
+                         "Reprezentacja": REP_LABEL[rep], "Detektor": DET_LABEL[r.detector],
+                         "R globalne": r.test_recall_global, "R lokalne": r.test_recall_local,
+                         "PR-AUC": r.test_pr_auc})
+    tabular(pd.DataFrame(rows), TAB / "recall_by_type.tex", align="lllrrr")
 
 
-def table_pca_types(runs):
-    """Synthetic data: recall per anomaly type as a function of PCA components."""
-    pca = runs[(runs.dataset == "synthetic") & (runs.rep == "PCA")].copy()
+def table_pca_types(runs, dataset):
+    """Recall per anomaly type as a function of the number of PCA components."""
+    pca = runs[(runs.dataset == dataset) & (runs.rep == "PCA")].copy()
     pca["k"] = pca.rep_params.map(lambda p: json.loads(p)["n_components"])
-    orig = runs[(runs.dataset == "synthetic") & (runs.rep == "Original")]
+    orig = runs[(runs.dataset == dataset) & (runs.rep == "Original")]
+    dim = int(orig.rep_dim.iloc[0])
     rows = []
 
     def row(det, k, r, first):
         return {"Detektor": DET_LABEL[det] if first else "", "$k$": k, "zach. wariancja": "",
                 "PR-AUC": num(r.test_pr_auc), "R globalne": num(r.test_recall_global),
-                "R lokalne": num(r.test_recall_local),
-                "R podprzestrzenne": num(r.test_recall_subspace)}
+                "R lokalne": num(r.test_recall_local)}
 
     for det in ("LOF", "IForest", "Reconstruction"):
         first = True
         if det != "Reconstruction":
             ref = select(orig[orig.detector == det], ["dataset"]).iloc[0]
-            rows.append(dict(row(det, "oryg. (30)", ref, first), **{"zach. wariancja": "1,00"}))
+            rows.append(dict(row(det, f"oryg. ({dim})", ref, first),
+                             **{"zach. wariancja": "1,00"}))
             first = False
         best = select(pca[pca.detector == det], ["k"]).sort_values("k")
         for _, r in best[best.k.isin([2, 3, 5, 10, 20])].iterrows():
             rows.append(row(det, str(int(r.k)), r, first))
             first = False
     st = pd.read_csv(OUT / "structure.csv")
-    st = st[(st.dataset == "synthetic") & (st.rep == "PCA")]
+    st = st[(st.dataset == dataset) & (st.rep == "PCA")]
     ev = st.assign(k=st.rep_params.map(lambda p: json.loads(p)["n_components"])).groupby(
         "k").explained_variance.mean()
     for r in rows:
         if r["$k$"].isdigit():
             r["zach. wariancja"] = num(ev[int(r["$k$"])], 2)
-    tabular(pd.DataFrame(rows), TAB / "pca_types_synthetic.tex", align="llrrrrr")
+    tabular(pd.DataFrame(rows), TAB / f"pca_types_{dataset}.tex", align="llrrrr")
 
 
 # ------------------------------------------------------------------ figures
 
 def fig_matrix(best):
     fig, axes = plt.subplots(1, 4, figsize=(13, 3.0))
-    for ax, d in zip(axes, HIGHDIM_DATASETS):
+    for ax, d in zip(axes, TASK2_DATASETS):
         M = np.full((4, 4), np.nan)
         for i, rep in enumerate(REPS):
             for j, det in enumerate(DETECTORS):
@@ -225,7 +228,7 @@ def fig_matrix(best):
             else:
                 ax.text(j, i, "n/d", ha="center", va="center", fontsize=7, color="#52514e")
         ax.set_xticks(range(4), [DET_LABEL[x] for x in DETECTORS], rotation=30, fontsize=7.5)
-        ax.set_yticks(range(4), [REP_LABEL[x] for x in REPS] if d == HIGHDIM_DATASETS[0]
+        ax.set_yticks(range(4), [REP_LABEL[x] for x in REPS] if d == TASK2_DATASETS[0]
                       else [""] * 4)
         ax.set_title(DISPLAY_NAMES[d])
         ax.grid(False)
@@ -237,7 +240,7 @@ def fig_pca(runs, structure):
     pca["k"] = pca.rep_params.map(lambda p: json.loads(p)["n_components"])
     orig = runs[runs.rep == "Original"]
     fig, axes = plt.subplots(2, 4, figsize=(13, 4.8), sharex="col")
-    for j, d in enumerate(HIGHDIM_DATASETS):
+    for j, d in enumerate(TASK2_DATASETS):
         ax = axes[0, j]
         for det in DETECTORS:
             sub = pca[(pca.dataset == d) & (pca.detector == det)]
@@ -269,15 +272,22 @@ def fig_umap(runs):
     cols = [(n, md) for n in (5, 15, 50) for md in (0.0, 0.5)]
     fig, axes = plt.subplots(3, 4, figsize=(13, 5.6))
     for i, det in enumerate(["IForest", "LOF", "OCSVM"]):
-        for j, d in enumerate(HIGHDIM_DATASETS):
+        for j, d in enumerate(TASK2_DATASETS):
             sub = um[(um.dataset == d) & (um.detector == det)]
             best = select(sub, ["n_components", "n_neighbors", "min_dist"])
-            M = np.array([[best[(best.n_components == c) & (best.n_neighbors == n)
-                                & (best.min_dist == md)].test_pr_auc.iloc[0]
-                           for n, md in cols] for c in (2, 5, 10)])
+            M = np.full((3, len(cols)), np.nan)
+            for a, c in enumerate((2, 5, 10)):
+                for b, (n, md) in enumerate(cols):
+                    hit = best[(best.n_components == c) & (best.n_neighbors == n)
+                               & (best.min_dist == md)]
+                    if not hit.empty:
+                        M[a, b] = hit.test_pr_auc.iloc[0]
             ax = axes[i, j]
-            ax.imshow(M, cmap=BLUES, vmin=0, vmax=1, aspect="auto")
+            ax.imshow(np.ma.masked_invalid(M), cmap=BLUES, vmin=0, vmax=1, aspect="auto")
             for (a, b), v in np.ndenumerate(M):
+                if np.isnan(v):
+                    ax.text(b, a, "--", ha="center", va="center", fontsize=7, color="#52514e")
+                    continue
                 ax.text(b, a, num(v, 2), ha="center", va="center", fontsize=7,
                         color="white" if v > 0.6 else "#0b0b0b")
             ax.set_xticks(range(6), [f"{n}/{num(md, 1)}" for n, md in cols], fontsize=6.5)
@@ -298,7 +308,7 @@ def fig_umap_structure(structure):
         st[key] = st.rep_params.map(lambda p, k=key: json.loads(p)[k])
     fig, axes = plt.subplots(2, 4, figsize=(13, 4.6), sharex=True)
     shades = {2: BLUES(0.4), 5: BLUES(0.65), 10: BLUES(0.95)}
-    for j, d in enumerate(HIGHDIM_DATASETS):
+    for j, d in enumerate(TASK2_DATASETS):
         sub = st[st.dataset == d]
         for c in (2, 5, 10):
             for md, ls in ((0.0, "-"), (0.5, "--")):
@@ -323,7 +333,7 @@ def fig_ae(runs):
     ae = runs[(runs.rep == "AE") & runs.main].copy()
     ae["z"] = ae.rep_params.map(lambda p: json.loads(p)["latent_dim"])
     fig, axes = plt.subplots(1, 4, figsize=(13, 2.7), sharey=True)
-    for ax, d in zip(axes, HIGHDIM_DATASETS):
+    for ax, d in zip(axes, TASK2_DATASETS):
         for det in DETECTORS:
             best = select(ae[(ae.dataset == d) & (ae.detector == det)], ["z"]).sort_values("z")
             ax.plot(best.z, best.test_pr_auc, marker="o", color=DET_COLORS[det],
@@ -341,7 +351,7 @@ def fig_ae(runs):
     hist = hist[hist.rep_params.str.contains('"latent_dim": 8', regex=False)
                 & hist.rep_params.str.contains(MAIN_AE, regex=False)]
     fig, axes = plt.subplots(1, 4, figsize=(13, 2.5))
-    for ax, d in zip(axes, HIGHDIM_DATASETS):
+    for ax, d in zip(axes, TASK2_DATASETS):
         h = hist[hist.dataset == d]
         ax.plot(h.epoch, h.train_loss, color="#2a78d6", lw=1.5, label="uczenie")
         ax.plot(h.epoch, h.holdout_loss, color="#eb6834", lw=1.5, label="odłożone 15\\%")
@@ -361,28 +371,24 @@ def fig_embeddings():
                "UMAP ($m$=2, nn=15, md=0)"),
               ("AE", '{"hidden": [64, 32], "latent_dim": 2}', "Autoenkoder ($z$=2)")]
     fig, axes = plt.subplots(4, 3, figsize=(9.5, 11.5))
-    for i, d in enumerate(HIGHDIM_DATASETS):
+    for i, d in enumerate(TASK2_DATASETS):
         for j, (rep, params, title) in enumerate(panels):
             ax = axes[i, j]
             e = emb[(emb.dataset == d) & (emb.rep == rep) & (emb.rep_params == params)]
             n = e[e.y == 0]
-            ax.scatter(n.z1, n.z2, s=7, c=NORMAL_COLOR, lw=0, label="normalne")
-            if d == "synthetic":
-                for t, color in TYPE_COLORS.items():
-                    a = e[e.type == t]
-                    ax.scatter(a.z1, a.z2, s=16, c=color, ec="white", lw=0.4,
-                               label=f"anomalie {TYPE_LABELS[t]}")
-            else:
-                a = e[e.y == 1]
-                ax.scatter(a.z1, a.z2, s=16, c=ANOMALY_COLOR, ec="white", lw=0.4,
-                           label="anomalie")
+            ax.scatter(n.z1, n.z2, s=4 if len(n) > 2000 else 7, c=NORMAL_COLOR, lw=0,
+                       label="normalne")
+            for t, color in TYPE_COLORS.items():
+                a = e[e.type == t]
+                ax.scatter(a.z1, a.z2, s=8 if len(a) > 300 else 16, c=color, ec="white",
+                           lw=0.3, label=f"anomalie {TYPE_LABELS[t]}")
             ax.set_xticks([]), ax.set_yticks([])
             if i == 0:
                 ax.set_title(title)
             if j == 0:
                 ax.set_ylabel(DISPLAY_NAMES[d])
-        if d in ("ionosphere", "synthetic"):
-            axes[i, 2].legend(fontsize=6.5, loc="best")
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, ncol=3, loc="lower center", bbox_to_anchor=(0.5, -0.02))
     save(fig, FIG / "embeddings_2d")
 
 
@@ -394,7 +400,7 @@ def fig_separation(runs, structure):
     df = best.merge(st, on=["dataset", "rep", "rep_params"])
     markers = {"Original": "*", "PCA": "o", "UMAP": "s", "AE": "^"}
     fig, axes = plt.subplots(1, 4, figsize=(13, 2.9), sharey=True)
-    for ax, d in zip(axes, HIGHDIM_DATASETS):
+    for ax, d in zip(axes, TASK2_DATASETS):
         sub = df[df.dataset == d]
         for rep in REPS:
             s = sub[sub.rep == rep]
@@ -413,7 +419,7 @@ def fig_separation(runs, structure):
 def fig_time(best):
     markers = {"Original": "*", "PCA": "o", "UMAP": "s", "AE": "^"}
     fig, axes = plt.subplots(1, 4, figsize=(13, 2.9), sharey=True)
-    for ax, d in zip(axes, HIGHDIM_DATASETS):
+    for ax, d in zip(axes, TASK2_DATASETS):
         sub = best[best.dataset == d]
         for _, r in sub.iterrows():
             ax.scatter(1000 * r.total_time, r.test_pr_auc, marker=markers[r.rep],
@@ -444,7 +450,8 @@ def main():
     comparison.to_csv(OUT / "task1_comparison.csv", index=False)
     table_ae_architecture(runs, structure)
     table_types(best)
-    table_pca_types(runs[runs.main])
+    for d in TASK2_DATASETS:
+        table_pca_types(runs[runs.main], d)
 
     fig_matrix(best)
     fig_pca(runs[runs.main], structure)

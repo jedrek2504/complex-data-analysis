@@ -12,9 +12,9 @@ by task3_ensemble/run_ensembles.py without refitting.
 
 Outputs (results/task3/): base_configs.csv, base_scores.csv.gz, base_times.csv
 
-With ``--confirm`` the same detectors are run on ten fresh splits (seeds
-10-19) that were not used while designing the ensembles; the outputs then
-go to results/task3/confirm/.
+With ``--confirm`` the same detectors are run on fresh splits (the next
+block of seeds, see common/protocol.py) that were not used while designing
+the ensembles; the outputs then go to results/task3/confirm/.
 """
 
 import argparse
@@ -28,14 +28,13 @@ import pandas as pd  # noqa: E402
 
 from common import ROOT  # noqa: E402
 from common.anomaly_types import anomaly_kind  # noqa: E402
-from common.datasets import HIGHDIM_DATASETS  # noqa: E402
+from common.datasets import TASK3_DATASETS  # noqa: E402
 from common.detectors import build as build_detector  # noqa: E402
-from common.protocol import SEEDS, make_experiment  # noqa: E402
+from common.protocol import make_experiment, seeds_for  # noqa: E402
 from task2_representations.representations import build as build_rep  # noqa: E402
 from task2_representations.run import _warm_up_umap  # noqa: E402
 
 OUT = ROOT / "results" / "task3"
-CONFIRM_SEEDS = tuple(range(10, 20))
 BASE = ["IForest", "LOF", "OCSVM", "PCA"]
 
 
@@ -47,7 +46,7 @@ def choose_base_configs():
     """Per dataset: best representation + parameters of each base detector."""
     sel = pd.read_csv(ROOT / "results" / "task2" / "selected_configs.csv")
     rows = []
-    for d in HIGHDIM_DATASETS:
+    for d in TASK3_DATASETS:
         for name in BASE:
             if name == "PCA":
                 cand = sel[(sel.dataset == d) & (sel.rep == "PCA")
@@ -79,19 +78,18 @@ def base_scores(cfg, exp):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--confirm", action="store_true", help="use fresh seeds 10-19")
+    parser.add_argument("--confirm", action="store_true", help="use the fresh seeds")
     confirm = parser.parse_args().confirm
     out = output_dir(confirm)
     out.mkdir(parents=True, exist_ok=True)
-    seeds = CONFIRM_SEEDS if confirm else SEEDS
     configs = choose_base_configs()
     configs.to_csv(out / "base_configs.csv", index=False)
     _warm_up_umap()  # keep numba compilation out of the timings
     scores, times = [], []
-    for d in HIGHDIM_DATASETS:
-        for seed in seeds:
+    for d in TASK3_DATASETS:
+        kinds = anomaly_kind(d)
+        for seed in seeds_for(d, confirm):
             exp = make_experiment(d, seed)
-            kinds = anomaly_kind(d, seed)
             for _, cfg in configs[configs.dataset == d].iterrows():
                 tr, va, te, elapsed = base_scores(cfg, exp)
                 times.append({"dataset": d, "seed": seed, "base": cfg.base, "time": elapsed})

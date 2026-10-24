@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from common import ROOT
-from common.datasets import DISPLAY_NAMES, HIGHDIM_DATASETS
+from common.datasets import DISPLAY_NAMES, TASK1_DATASETS, TASK3_DATASETS
 from common.latex import num, pm, tabular
 from common.plotting import BLUES, DIVERGING, METHOD_COLORS, save, setup
 from task3_ensemble.ensemble import normalise
@@ -15,7 +15,7 @@ from task3_ensemble.run_base import BASE, OUT
 
 FIG, TAB = OUT / "figures", OUT / "tables"
 NORMAL_HIST = "#b4b2aa"
-NAMES = [DISPLAY_NAMES[d] for d in HIGHDIM_DATASETS]
+NAMES = [DISPLAY_NAMES[d] for d in TASK3_DATASETS]
 BASE_LABEL = {"IForest": "IForest", "LOF": "LOF", "OCSVM": "OCSVM", "PCA": "PCA (rekonstr.)"}
 BASE_COLORS = {"IForest": METHOD_COLORS["IForest"], "LOF": METHOD_COLORS["LOF"],
                "OCSVM": METHOD_COLORS["OCSVM"], "PCA": METHOD_COLORS["PCA"]}
@@ -43,7 +43,7 @@ def summary(variants):
 def table_base_configs():
     cfg = pd.read_csv(OUT / "base_configs.csv")
     rows = []
-    for d in HIGHDIM_DATASETS:
+    for d in TASK3_DATASETS:
         for i, b in enumerate(BASE):
             r = cfg[(cfg.dataset == d) & (cfg.base == b)].iloc[0]
             rp, dp = json.loads(r.rep_params), json.loads(r.det_params)
@@ -68,7 +68,7 @@ def table_main(summ):
     lines = ["\\begin{longtable}{llrrrrrr}", "\\toprule",
              "Zbiór & Wariant & Prec. & Rec. & F1 & ROC-AUC & PR-AUC & Czas [ms] \\\\",
              "\\midrule", "\\endhead"]
-    for d in HIGHDIM_DATASETS:
+    for d in TASK3_DATASETS:
         sub = summ[summ.dataset == d].set_index("variant")
         best_f1 = sub.loc[MAIN_ROWS, "f1"].max()
         best_pr = sub.loc[MAIN_ROWS, "pr_auc"].max()
@@ -135,7 +135,7 @@ def table_ablation(variants):
 
 def table_cases(dec):
     rows = []
-    for d in HIGHDIM_DATASETS:
+    for d in TASK3_DATASETS:
         sub = dec[dec.dataset == d]
         for ens in ("MV 2/4", "MV 3/4", "Fusion mean", "DSF", "CBF"):
             a, n = sub[sub.y == 1], sub[sub.y == 0]
@@ -175,7 +175,7 @@ def table_confirmation(variants, confirm):
     names = ["best-single", "MV 2/4", "Fusion mean", "Fusion skill", "DSF", "CBF"]
     for v in names:
         r = {"Wariant": ROW_LABEL.get(v, v).replace("\\textbf{", "").replace("}", "")}
-        for label, df in (("0--9", variants), ("10--19", confirm)):
+        for label, df in (("projekt.", variants), ("potw.", confirm)):
             sub = df[df.variant == v].groupby("dataset")[["pr_auc", "f1"]].mean()
             r[f"PR-AUC ({label})"] = num(sub.pr_auc.mean())
             r[f"F1 ({label})"] = num(sub.f1.mean())
@@ -184,7 +184,7 @@ def table_confirmation(variants, confirm):
         rows.append(r)
     tabular(pd.DataFrame(rows), TAB / "confirmation.tex", align="lrrrrrr")
     per_ds = []
-    for label, df in (("0--9", variants), ("10--19", confirm)):
+    for label, df in (("design", variants), ("confirm", confirm)):
         t = df[df.variant.isin(names)].groupby(["variant", "dataset"])[["pr_auc", "f1"]].mean()
         per_ds.append(t.assign(seeds=label))
     pd.concat(per_ds).to_csv(OUT / "confirmation.csv")
@@ -196,7 +196,7 @@ def fig_jaccard():
     jac = pd.read_csv(OUT / "jaccard.csv")
     fig, axes = plt.subplots(1, 4, figsize=(12, 3.0))
     labels = ["IForest", "LOF", "OCSVM", "PCA"]
-    for ax, d in zip(axes, HIGHDIM_DATASETS):
+    for ax, d in zip(axes, TASK3_DATASETS):
         M = (jac[jac.dataset == d].groupby(["a", "b"]).jaccard.mean().unstack()
              .loc[BASE, BASE].values)
         ax.imshow(M, cmap=BLUES, vmin=0, vmax=1)
@@ -204,7 +204,7 @@ def fig_jaccard():
             ax.text(j, i, num(v, 2), ha="center", va="center", fontsize=7.5,
                     color="white" if v > 0.6 else "#0b0b0b")
         ax.set_xticks(range(4), labels, rotation=40, fontsize=7.5)
-        ax.set_yticks(range(4), labels if d == HIGHDIM_DATASETS[0] else [""] * 4, fontsize=7.5)
+        ax.set_yticks(range(4), labels if d == TASK3_DATASETS[0] else [""] * 4, fontsize=7.5)
         ax.set_title(DISPLAY_NAMES[d])
         ax.grid(False)
     save(fig, FIG / "jaccard_heatmap")
@@ -214,7 +214,7 @@ def fig_voting(summ):
     fig, axes = plt.subplots(1, 4, figsize=(13, 2.8), sharey=True)
     styles = {"precision": ("Precision", "#2a78d6", "-"), "recall": ("Recall", "#eb6834", "-"),
               "f1": ("F1", "#0b0b0b", "-")}
-    for ax, d in zip(axes, HIGHDIM_DATASETS):
+    for ax, d in zip(axes, TASK3_DATASETS):
         sub = summ[summ.dataset == d].set_index("variant")
         m = [1, 2, 3, 4]
         for metric, (label, color, ls) in styles.items():
@@ -254,7 +254,7 @@ def fig_ablation_heatmap(abl):
 def fig_complementarity(variants):
     comp = pd.read_csv(OUT / "complementarity.csv")
     best = variants[variants.variant == "best-single"][["dataset", "seed", "pr_auc", "f1"]]
-    shades = {d: BLUES(0.3 + 0.2 * i) for i, d in enumerate(HIGHDIM_DATASETS)}
+    shades = {d: BLUES(0.3 + 0.2 * i) for i, d in enumerate(TASK3_DATASETS)}
     fig, axes = plt.subplots(1, 4, figsize=(14, 3.0))
     for ax, ens, x, xlabel in ((axes[0], "Fusion mean", "mean_jaccard", "średni Jaccard detektorów"),
                                (axes[1], "Fusion mean", "unique_hits", "udział anomalii wykrytych przez 1 det."),
@@ -266,7 +266,7 @@ def fig_complementarity(variants):
                                                           suffixes=("", "_best"))
         metric = "f1" if ens.startswith("MV") else "pr_auc"
         df["gain"] = df[metric] - df[f"{metric}_best"]
-        for d in HIGHDIM_DATASETS:
+        for d in TASK3_DATASETS:
             s = df[df.dataset == d]
             ax.scatter(s[x], s.gain, s=20, color=shades[d], label=DISPLAY_NAMES[d],
                        edgecolor="white", lw=0.4)
@@ -287,7 +287,7 @@ def fig_weights(variants):
         sub = variants[variants.variant == v]
         W = np.array([np.array(json.loads(w)) for w in sub.w])
         mean_w = pd.DataFrame(W, columns=BASE).assign(dataset=sub.dataset.values).groupby(
-            "dataset").mean().loc[list(HIGHDIM_DATASETS)]
+            "dataset").mean().loc[list(TASK3_DATASETS)]
         bottom = np.zeros(len(mean_w))
         for b in BASE:
             ax.bar(range(len(mean_w)), mean_w[b], 0.6, bottom=bottom, color=BASE_COLORS[b],
@@ -295,7 +295,7 @@ def fig_weights(variants):
             bottom += mean_w[b].values
         ax.set_xticks(range(len(mean_w)), NAMES, fontsize=8)
         ax.set_title(title)
-    axes[0].set_ylabel("średnia waga (10 podziałów)")
+    axes[0].set_ylabel("średnia waga (wszystkie podziały)")
     axes[2].legend(fontsize=7, loc="upper left", bbox_to_anchor=(1.0, 1.0))
     save(fig, FIG / "weights")
 
@@ -303,7 +303,7 @@ def fig_weights(variants):
 def fig_normalisation():
     """Why normalisers should be fitted on out-of-sample scores (one split)."""
     scores = pd.read_csv(OUT / "base_scores.csv.gz")
-    sub = scores[(scores.dataset == "ionosphere") & (scores.seed == 0) & (scores.base == "OCSVM")]
+    sub = scores[(scores.dataset == "cardio") & (scores.seed == 0) & (scores.base == "OCSVM")]
     parts = {p: sub[sub.part == p].score.values for p in ("train", "val", "test")}
     y_test = sub[sub.part == "test"].y.values
     fig, axes = plt.subplots(1, 4, figsize=(13, 2.6))
@@ -334,12 +334,13 @@ def synthesis(summ):
     """Effect of algorithm, representation and ensemble on test PR-AUC."""
     t1 = pd.read_csv(ROOT / "results" / "task1" / "best_metrics.csv")
     t1_mean = t1.groupby(["dataset", "method"]).pr_auc.mean()
-    t1_cfg = pd.read_csv(ROOT / "results" / "task1" / "best_configs.csv")
+    # task 1 has its own datasets: the spread between its five methods
+    t1_spread = pd.DataFrame({"dataset": list(TASK1_DATASETS), "algo_spread_t1": [
+        t1_mean.loc[d].max() - t1_mean.loc[d].min() for d in TASK1_DATASETS]})
+    t1_spread.to_csv(OUT / "synthesis_task1_spread.csv", index=False)
     t2 = pd.read_csv(ROOT / "results" / "task2" / "selected_configs.csv")
     rows, ladder = [], []
-    for d in HIGHDIM_DATASETS:
-        a1 = t1_mean.loc[d]
-        sel1 = t1_cfg[t1_cfg.dataset == d].set_index("method").val_pr_auc.idxmax()
+    for d in TASK3_DATASETS:
         orig = t2[(t2.dataset == d) & (t2.rep == "Original") & (t2.detector != "Reconstruction")]
         reps = t2[(t2.dataset == d) & t2.detector.isin(["IForest", "LOF", "OCSVM"])]
         rep_spread = reps.groupby("detector").test_pr_auc.agg(lambda s: s.max() - s.min()).mean()
@@ -347,7 +348,6 @@ def synthesis(summ):
         s = summ[summ.dataset == d].set_index("variant")
         rows.append({
             "dataset": d,
-            "algo_spread_t1": a1.max() - a1.min(),
             "algo_spread_t2": orig.test_pr_auc.max() - orig.test_pr_auc.min(),
             "rep_spread": rep_spread,
             "ens_gain_cbf": s.loc["CBF", "pr_auc"] - s.loc["best-single", "pr_auc"],
@@ -357,7 +357,6 @@ def synthesis(summ):
         algo = orig.loc[orig.val_pr_auc.idxmax()]
         ladder.append({"dataset": d,
                        "IForest (oryg.)": base,
-                       "Zad. 1: wybór algorytmu": a1[sel1],
                        "Zad. 2: wybór algorytmu (oryg.)": algo.test_pr_auc,
                        "Zad. 2: wybór repr. i algorytmu": best_t2.test_pr_auc,
                        "Zad. 3: najl. pojedynczy": s.loc["best-single", "pr_auc"],
@@ -366,8 +365,7 @@ def synthesis(summ):
                        "Zad. 3: MV 2/4 (F1)": s.loc["MV 2/4", "f1"],
                        "Zad. 3: CBF (F1)": s.loc["CBF", "f1"],
                        "Zad. 3: najl. pojed. (F1)": s.loc["best-single", "f1"],
-                       "algo_t2": algo.detector, "rep_t2": f"{best_t2.rep}/{best_t2.detector}",
-                       "algo_t1": sel1})
+                       "algo_t2": algo.detector, "rep_t2": f"{best_t2.rep}/{best_t2.detector}"})
     eff = pd.DataFrame(rows)
     lad = pd.DataFrame(ladder)
     eff.to_csv(OUT / "synthesis_effects.csv", index=False)
@@ -375,21 +373,19 @@ def synthesis(summ):
 
     out = pd.DataFrame({
         "Zbiór": [DISPLAY_NAMES[d] for d in eff.dataset],
-        "Algorytm (Zad. 1, 5 metod)": [num(v) for v in eff.algo_spread_t1],
         "Algorytm (Zad. 2, oryg.)": [num(v) for v in eff.algo_spread_t2],
         "Reprezentacja": [num(v) for v in eff.rep_spread],
         "Zespół: średnia": [("+" if v >= 0 else "") + num(v) for v in eff.ens_gain_mean],
         "Zespół: CBF": [("+" if v >= 0 else "") + num(v) for v in eff.ens_gain_cbf]})
     mean_row = {"Zbiór": "\\textit{średnio}",
-                "Algorytm (Zad. 1, 5 metod)": num(eff.algo_spread_t1.mean()),
                 "Algorytm (Zad. 2, oryg.)": num(eff.algo_spread_t2.mean()),
                 "Reprezentacja": num(eff.rep_spread.mean()),
                 "Zespół: średnia": ("+" if eff.ens_gain_mean.mean() >= 0 else "") + num(eff.ens_gain_mean.mean()),
                 "Zespół: CBF": ("+" if eff.ens_gain_cbf.mean() >= 0 else "") + num(eff.ens_gain_cbf.mean())}
     out = pd.concat([out, pd.DataFrame([mean_row])])
-    tabular(out, TAB / "synthesis_effects.tex", align="lrrrrr")
+    tabular(out, TAB / "synthesis_effects.tex", align="lrrrr")
 
-    cols = ["IForest (oryg.)", "Zad. 1: wybór algorytmu", "Zad. 2: wybór algorytmu (oryg.)",
+    cols = ["IForest (oryg.)", "Zad. 2: wybór algorytmu (oryg.)",
             "Zad. 2: wybór repr. i algorytmu", "Zad. 3: najl. pojedynczy",
             "Zad. 3: fuzja średnia", "Zad. 3: CBF"]
     t = pd.DataFrame({"Etap": cols})
@@ -399,12 +395,14 @@ def synthesis(summ):
     tabular(t, TAB / "synthesis_ladder.tex", align="lrrrrr")
 
     fig, ax = plt.subplots(figsize=(11, 3.0))
-    width = 0.11
+    width = 0.13
     shades = [BLUES(v) for v in np.linspace(0.15, 0.95, len(cols))]
+    n = len(NAMES) + 1
     for i, c in enumerate(cols):
         vals = list(lad[c]) + [lad[c].mean()]
-        ax.bar(np.arange(5) + (i - 3) * width, vals, width * 0.92, color=shades[i], label=c)
-    ax.set_xticks(range(5), NAMES + ["średnio"])
+        ax.bar(np.arange(n) + (i - (len(cols) - 1) / 2) * width, vals, width * 0.92,
+               color=shades[i], label=c)
+    ax.set_xticks(range(n), NAMES + ["średnio"])
     ax.set_ylabel("PR-AUC (test)")
     ax.set_ylim(0, 1)
     ax.legend(ncol=4, fontsize=7, loc="upper center", bbox_to_anchor=(0.5, 1.28))

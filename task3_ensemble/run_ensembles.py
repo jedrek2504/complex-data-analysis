@@ -9,7 +9,8 @@ Variants
 single         each base detector, threshold maximising validation F1
 best-single    the base detector with the highest validation PR-AUC
 MV m/4         anomaly if at least m detectors flag it (per-detector
-               thresholds from validation F1 or from contamination 0.1)
+               thresholds from validation F1 or from the share of anomalies
+               in the validation part)
 fusion         S(x) = sum_k w_k * norm_k(s_k(x)) for every combination of
                normalisation, weighting scheme, detector subset and
                threshold rule
@@ -62,7 +63,7 @@ def arrays(df, part):
 
 def per_kind_recall(pred, y, kinds):
     out = {}
-    for kind in ("global", "local", "subspace"):
+    for kind in ("global", "local"):
         m = kinds == kind
         out[f"recall_{kind}"] = pred[m].mean() if m.any() else np.nan
     return out
@@ -86,7 +87,7 @@ def run_split(df, base_time):
     all_members = np.ones(len(BASE), bool)
     # single detectors
     thr_f1 = np.array([best_f1_threshold(y_va, s) for s in S_va])
-    thr_c = np.array([contamination_threshold(s, 0.1) for s in S_va])
+    thr_c = np.array([contamination_threshold(s, y_va.mean()) for s in S_va])
     dec_f1 = (S_te >= thr_f1[:, None]).astype(int)
     dec_c = (S_te > thr_c[:, None]).astype(int)
     val_ap = E.skill(y_va, S_va)[1]
@@ -166,7 +167,7 @@ def run_split(df, base_time):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--confirm", action="store_true", help="use fresh seeds 10-19")
+    parser.add_argument("--confirm", action="store_true", help="use the fresh seeds")
     out = output_dir(parser.parse_args().confirm)
     scores = pd.read_csv(out / "base_scores.csv.gz")
     times = pd.read_csv(out / "base_times.csv")

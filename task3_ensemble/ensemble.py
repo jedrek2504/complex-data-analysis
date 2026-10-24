@@ -184,13 +184,14 @@ def competent_set(y_val, S_val, n_boot=500, alpha=0.1, seed=0):
 # --------------------------------------------------------------- threshold
 
 
-def threshold(rule, y_val, fused_val, contamination=0.1):
+def threshold(rule, y_val, fused_val):
     """Decision threshold of the fused score.
 
-    f1  - maximises F1 on the validation part (uses validation labels),
-    contamination - flags the expected share of validation points
-                    (out-of-sample scores, no labels).
+    f1  - maximises F1 on the validation part,
+    contamination - flags the share of validation points equal to the share
+                    of anomalies in the validation part (only this number is
+                    taken from the labels, not which points are anomalies).
     """
     if rule == "f1":
         return best_f1_threshold(y_val, fused_val)
-    return contamination_threshold(fused_val, contamination)
+    return contamination_threshold(fused_val, float(np.mean(y_val)))

@@ -23,8 +23,8 @@ MAIN_ROWS = ["IForest", "LOF", "OCSVM", "PCA", "best-single", "MV 1/4", "MV 2/4"
              "MV 4/4", "max rank/val", "Fusion mean", "Fusion AP", "Fusion skill", "DSF", "CBF"]
 ROW_LABEL = {"best-single": "Najlepszy pojedynczy (wal.)", "max rank/val": "Fuzja: maksimum",
              "Fusion mean": "Fuzja: średnia", "Fusion AP": "Fuzja: wagi PR-AUC",
-             "Fusion skill": "Fuzja: wagi skill", "DSF": "DSF (własna, wersja 1)",
-             "CBF": "\\textbf{CBF (własna)}", "PCA": "PCA (rekonstr.)"}
+             "Fusion skill": "Fuzja: wagi skill", "DSF": "DSF (własna)",
+             "CBF": "CBF (własna)", "PCA": "PCA (rekonstr.)"}
 SCHEMES = ["uniform", "ap", "skill", "diverse"]
 NORMS = ["minmax", "zscore", "robust", "rank"]
 REP_LABEL = {"Original": "oryginalna", "PCA": "PCA", "UMAP": "UMAP", "AE": "autoenkoder"}
@@ -303,7 +303,7 @@ def fig_weights(variants):
 def fig_normalisation():
     """Why normalisers should be fitted on out-of-sample scores (one split)."""
     scores = pd.read_csv(OUT / "base_scores.csv.gz")
-    sub = scores[(scores.dataset == "cardio") & (scores.seed == 0) & (scores.base == "OCSVM")]
+    sub = scores[(scores.dataset == "campaign") & (scores.seed == 0) & (scores.base == "OCSVM")]
     parts = {p: sub[sub.part == p].score.values for p in ("train", "val", "test")}
     y_test = sub[sub.part == "test"].y.values
     fig, axes = plt.subplots(1, 4, figsize=(13, 2.6))

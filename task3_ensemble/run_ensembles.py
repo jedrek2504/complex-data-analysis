@@ -19,14 +19,16 @@ max            maximum of rank-normalised scores (classical alternative)
 Normalisers are fitted either on the in-sample training scores or on the
 (unlabelled) validation scores; the named variants use the latter.
 
-Two own variants are evaluated:
+Two own variants are evaluated, both fixed before running them on the
+benchmark data:
 DSF  (diversity-weighted skill fusion) - rank normalisation fitted on
      validation scores, weights proportional to validation skill times
      (1 - redundancy), greedy forward selection, validation-F1 threshold;
-CBF  (competence-based fusion) - designed after analysing why DSF fails:
-     the detectors that a bootstrap of the validation part cannot tell apart
-     from the best one are averaged with equal weights (robust z-score
-     fitted on validation scores), clearly worse ones are dropped.
+CBF  (competence-based fusion) - the detectors that a bootstrap of the
+     validation part cannot tell apart from the best one are averaged with
+     equal weights (robust z-score fitted on validation scores), clearly
+     worse ones are dropped; meant for small validation parts, where
+     continuous weights and greedy selection fit noise.
 
 Outputs (results/task3/): variants.csv, test_decisions.csv.gz,
 complementarity.csv

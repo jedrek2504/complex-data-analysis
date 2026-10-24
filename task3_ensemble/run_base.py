@@ -11,8 +11,13 @@ training, validation and test parts, which are then combined in many ways
 by task3_ensemble/run_ensembles.py without refitting.
 
 Outputs (results/task3/): base_configs.csv, base_scores.csv.gz, base_times.csv
+
+With ``--confirm`` the same detectors are run on ten fresh splits (seeds
+10-19) that were not used while designing the ensembles; the outputs then
+go to results/task3/confirm/.
 """
 
+import argparse
 import json
 import os
 import time
@@ -30,7 +35,12 @@ from task2_representations.representations import build as build_rep  # noqa: E4
 from task2_representations.run import _warm_up_umap  # noqa: E402
 
 OUT = ROOT / "results" / "task3"
+CONFIRM_SEEDS = tuple(range(10, 20))
 BASE = ["IForest", "LOF", "OCSVM", "PCA"]
+
+
+def output_dir(confirm):
+    return OUT / "confirm" if confirm else OUT
 
 
 def choose_base_configs():
@@ -68,13 +78,18 @@ def base_scores(cfg, exp):
 
 
 def main():
-    OUT.mkdir(parents=True, exist_ok=True)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--confirm", action="store_true", help="use fresh seeds 10-19")
+    confirm = parser.parse_args().confirm
+    out = output_dir(confirm)
+    out.mkdir(parents=True, exist_ok=True)
+    seeds = CONFIRM_SEEDS if confirm else SEEDS
     configs = choose_base_configs()
-    configs.to_csv(OUT / "base_configs.csv", index=False)
+    configs.to_csv(out / "base_configs.csv", index=False)
     _warm_up_umap()  # keep numba compilation out of the timings
     scores, times = [], []
     for d in HIGHDIM_DATASETS:
-        for seed in SEEDS:
+        for seed in seeds:
             exp = make_experiment(d, seed)
             kinds = anomaly_kind(d, seed)
             for _, cfg in configs[configs.dataset == d].iterrows():
@@ -87,8 +102,8 @@ def main():
                                                 "part": part, "row": idx, "y": y,
                                                 "kind": kinds[idx], "score": s}))
             print(d, seed, flush=True)
-    pd.concat(scores).to_csv(OUT / "base_scores.csv.gz", index=False)
-    pd.DataFrame(times).to_csv(OUT / "base_times.csv", index=False)
+    pd.concat(scores).to_csv(out / "base_scores.csv.gz", index=False)
+    pd.DataFrame(times).to_csv(out / "base_times.csv", index=False)
 
 
 if __name__ == "__main__":

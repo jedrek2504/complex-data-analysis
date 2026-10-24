@@ -1,0 +1,26 @@
+dataset,method,params,val_pr_auc
+breast_cancer,COF,"{""n_neighbors"": 50}",0.534652024726373
+breast_cancer,DBSCAN,"{""eps_quantile"": 0.75, ""min_samples"": 20}",0.6194050884890945
+breast_cancer,IForest,"{""n_estimators"": 50}",0.6192471689172901
+breast_cancer,LOF,"{""n_neighbors"": 50}",0.5906103321954566
+breast_cancer,OCSVM,"{""gamma_factor"": 1.0, ""kernel"": ""sigmoid"", ""nu"": 0.5}",0.7081826622304976
+glass,COF,"{""n_neighbors"": 20}",0.23462051837051828
+glass,DBSCAN,"{""eps_quantile"": 0.75, ""min_samples"": 3}",0.25076340326340324
+glass,IForest,"{""n_estimators"": 200}",0.20998930583467748
+glass,LOF,"{""n_neighbors"": 35}",0.23825912750483685
+glass,OCSVM,"{""gamma_factor"": 0.1, ""kernel"": ""poly"", ""nu"": 0.05}",0.3051028819189196
+ionosphere,COF,"{""n_neighbors"": 35}",0.9154990842490843
+ionosphere,DBSCAN,"{""eps_quantile"": 0.9, ""min_samples"": 3}",0.9538478139793929
+ionosphere,IForest,"{""n_estimators"": 500}",0.7470396593186266
+ionosphere,LOF,"{""n_neighbors"": 20}",0.8660890709532014
+ionosphere,OCSVM,"{""gamma_factor"": 10.0, ""kernel"": ""rbf"", ""nu"": 0.05}",0.9558867521367521
+parkinsons,COF,"{""n_neighbors"": 10}",0.2247943117565543
+parkinsons,DBSCAN,"{""eps_quantile"": 0.5, ""min_samples"": 3}",0.18252543259222473
+parkinsons,IForest,"{""n_estimators"": 200}",0.20429974510842444
+parkinsons,LOF,"{""n_neighbors"": 5}",0.2658457382065127
+parkinsons,OCSVM,"{""gamma_factor"": 0.1, ""kernel"": ""poly"", ""nu"": 0.01}",0.36339430158197616
+synthetic,COF,"{""n_neighbors"": 10}",0.8565623414435318
+synthetic,DBSCAN,"{""eps_quantile"": 0.95, ""min_samples"": 10}",0.7455447164412549
+synthetic,IForest,"{""n_estimators"": 500}",0.6407261821376813
+synthetic,LOF,"{""n_neighbors"": 35}",0.9505391577492258
+synthetic,OCSVM,"{""gamma_factor"": 1.0, ""kernel"": ""rbf"", ""nu"": 0.05}",0.8267548500872302

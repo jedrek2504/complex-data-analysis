@@ -1,39 +1,79 @@
-"""Dataset loading and framing as anomaly-detection problems.
+"""Benchmark datasets for anomaly detection.
 
-Real datasets are classification problems; the majority class is treated as
-normal and the minority class as anomalous. When the minority class exceeds
-``TARGET_CONTAMINATION`` of the data it is randomly subsampled (with the run
-seed), so each seed sees a different subset of anomalies.
+Every dataset is read exactly as published in an anomaly-detection benchmark:
+the matrix X and the labels y (1 = anomaly) come from the file, nothing is
+generated, removed or subsampled here. The only later operations are the
+stratified split and the scaling fitted on the training part
+(common/protocol.py).
 
-The synthetic dataset gives full control over the anomaly type:
-``global`` (far from all data), ``local`` (close to a dense cluster but
-outside its scale) and ``subspace`` (off the low-dimensional manifold on
-which normal data lives).
+Sources
+-------
+ADBench  Han et al., NeurIPS 2022 - repository Minqi824/ADBench, pinned commit,
+         directory adbench/datasets/Classical (files *.npz with keys X, y)
+ODDS     Rayana, 2016 - arrhythmia.mat (variables X, y); the ODDS server does
+         not allow automated downloads, the file is placed in data/raw/odds/
+         by hand
+DAMI     Campos et al., DMKD 30(4), 2016 - HeartDisease (Statlog Heart),
+         variant without duplicates, not normalised, 5 % anomalies, v02
+
+Every file is checked against its SHA256 in data/CHECKSUMS.txt and against
+the shape and number of anomalies documented by the benchmark.
 """
 
-from dataclasses import dataclass, field
+import hashlib
+import tarfile
+from dataclasses import dataclass
 from urllib.request import urlretrieve
 
 import numpy as np
-import pandas as pd
-from sklearn.datasets import load_breast_cancer
+from scipy.io import arff, loadmat
 
 from . import DATA_DIR
 
-UCI_URL = "https://archive.ics.uci.edu/ml/machine-learning-databases/"
-TARGET_CONTAMINATION = 0.10
-SYNTHETIC_SEED = 2026
+RAW = DATA_DIR / "raw"
+CHECKSUMS = DATA_DIR / "CHECKSUMS.txt"
 
-# Datasets used in the tasks (Glass has fewer than 20 features: task 1 only).
-TASK1_DATASETS = ("breast_cancer", "ionosphere", "parkinsons", "glass", "synthetic")
-HIGHDIM_DATASETS = ("breast_cancer", "ionosphere", "parkinsons", "synthetic")
+ADBENCH_COMMIT = "3dac8221081e190f157d78e93bfa8867f90d0965"
+ADBENCH_URL = ("https://raw.githubusercontent.com/Minqi824/ADBench/"
+               f"{ADBENCH_COMMIT}/adbench/datasets/Classical/")
+DAMI_URL = "https://www.dbs.ifi.lmu.de/research/outlier-evaluation/input/HeartDisease.tar.gz"
+ODDS_PAGE = "https://odds.cs.stonybrook.edu/?p=312"
+HEART_FILE = "HeartDisease/HeartDisease_withoutdupl_05_v02.arff"
+
+TASK1_DATASETS = ("breastw", "mammography", "wine", "heart", "cardio")
+TASK2_DATASETS = ("cardio", "arrhythmia", "wdbc", "campaign")
+TASK3_DATASETS = ("cardio", "arrhythmia", "wdbc", "campaign")
 
 DISPLAY_NAMES = {
-    "breast_cancer": "Breast Cancer",
-    "ionosphere": "Ionosphere",
-    "parkinsons": "Parkinsons",
-    "glass": "Glass",
-    "synthetic": "Synthetic",
+    "breastw": "Breastw",
+    "wdbc": "WDBC",
+    "mammography": "Mammography",
+    "wine": "Wine",
+    "cardio": "Cardio",
+    "campaign": "Campaign",
+    "arrhythmia": "Arrhythmia",
+    "heart": "Statlog Heart",
+}
+
+
+@dataclass(frozen=True)
+class Spec:
+    source: str  # "adbench", "odds" or "dami"
+    file: str  # path relative to data/raw
+    n: int
+    d: int
+    anomalies: int
+
+
+SPECS = {
+    "breastw": Spec("adbench", "adbench/4_breastw.npz", 683, 9, 239),
+    "wdbc": Spec("adbench", "adbench/43_WDBC.npz", 367, 30, 10),
+    "mammography": Spec("adbench", "adbench/23_mammography.npz", 11183, 6, 260),
+    "wine": Spec("adbench", "adbench/45_wine.npz", 129, 13, 10),
+    "cardio": Spec("adbench", "adbench/6_cardio.npz", 1831, 21, 176),
+    "campaign": Spec("adbench", "adbench/5_campaign.npz", 41188, 62, 4640),
+    "arrhythmia": Spec("odds", "odds/arrhythmia.mat", 452, 274, 66),
+    "heart": Spec("dami", f"dami/{HEART_FILE}", 157, 13, 7),
 }
 
 
@@ -43,130 +83,79 @@ class Dataset:
     X: np.ndarray
     y: np.ndarray  # 1 = anomaly, 0 = normal
     feature_names: list
-    anomaly_type: np.ndarray = field(default=None)  # only for synthetic data
-    description: str = ""
 
     @property
     def contamination(self):
         return float(self.y.mean())
 
 
-def _fetch(relative_path):
-    """Download a UCI file once and cache it under data/raw."""
-    target = DATA_DIR / "raw" / relative_path
-    if not target.exists():
-        target.parent.mkdir(parents=True, exist_ok=True)
-        urlretrieve(UCI_URL + relative_path, target)
-    return target
+def _sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
-def _raw_breast_cancer():
-    bunch = load_breast_cancer()
-    # target: 0 = malignant (212), 1 = benign (357)
-    y = (bunch.target == 0).astype(int)
-    return bunch.data, y, list(bunch.feature_names), "malignant tumours"
+def _expected_checksums():
+    out = {}
+    for line in CHECKSUMS.read_text().splitlines():
+        if line.strip() and not line.startswith("#"):
+            digest, path = line.split()
+            out[path] = digest
+    return out
 
 
-def _raw_ionosphere():
-    df = pd.read_csv(_fetch("ionosphere/ionosphere.data"), header=None)
-    X = df.iloc[:, :34]
-    X = X.loc[:, X.std() > 0]  # attribute 2 is constant
-    y = (df[34] == "b").astype(int).to_numpy()
-    names = [f"a{i + 1:02d}" for i in X.columns]
-    return X.to_numpy(float), y, names, "'bad' radar returns"
+def _download(spec):
+    target = RAW / spec.file
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if spec.source == "adbench":
+        urlretrieve(ADBENCH_URL + target.name, target)
+    elif spec.source == "dami":
+        archive = RAW / "dami" / "HeartDisease.tar.gz"
+        urlretrieve(DAMI_URL, archive)
+        with tarfile.open(archive) as tar:
+            tar.extract(HEART_FILE, RAW / "dami", filter="data")
+    else:
+        raise FileNotFoundError(
+            f"{target} is missing: download arrhythmia.mat from {ODDS_PAGE} "
+            "and place it there")
 
 
-def _raw_parkinsons():
-    df = pd.read_csv(_fetch("parkinsons/parkinsons.data"))
-    y = (df["status"] == 0).astype(int).to_numpy()  # healthy is the minority
-    X = df.drop(columns=["name", "status"])
-    return X.to_numpy(float), y, list(X.columns), "recordings of healthy subjects"
+def _path(spec):
+    """Path of the raw file, downloaded if needed and verified by SHA256."""
+    path = RAW / spec.file
+    if not path.exists():
+        _download(spec)
+    expected = _expected_checksums().get(spec.file)
+    if expected is not None and _sha256(path) != expected:
+        raise ValueError(f"{path}: SHA256 differs from data/CHECKSUMS.txt")
+    return path
 
 
-def _raw_glass():
-    cols = ["id", "RI", "Na", "Mg", "Al", "Si", "K", "Ca", "Ba", "Fe", "type"]
-    df = pd.read_csv(_fetch("glass/glass.data"), header=None, names=cols)
-    y = (df["type"] == 6).astype(int).to_numpy()  # tableware glass, 9 samples
-    X = df[cols[1:-1]]
-    return X.to_numpy(float), y, list(X.columns), "tableware glass (type 6)"
+def _read(spec):
+    path = _path(spec)
+    if spec.source == "adbench":
+        data = np.load(path, allow_pickle=True)
+        return data["X"], data["y"], None
+    if spec.source == "odds":
+        data = loadmat(path)
+        return data["X"], data["y"].ravel(), None
+    records, meta = arff.loadarff(path)
+    names = [n for n in meta.names() if n not in ("id", "outlier")]
+    X = np.column_stack([records[n] for n in names])
+    y = (records["outlier"] == b"yes").astype(int)
+    return X, y, names
 
 
-def make_synthetic(n_normal=900, n_global=40, n_local=30, n_subspace=30,
-                   dim=30, latent_dim=4, noise=0.15, seed=SYNTHETIC_SEED):
-    """Gaussian clusters on a random 4-D linear manifold embedded in 30-D."""
-    rng = np.random.default_rng(seed)
-    basis, _ = np.linalg.qr(rng.normal(size=(dim, dim)))
-    W, W_perp = basis[:, :latent_dim], basis[:, latent_dim:]
-
-    centers = np.array([[4.0, 0, 0, 0], [-3.0, 3, 0, 0], [-3.0, -3, 2, 0]])
-    scales = np.array([0.35, 1.2, 1.2])  # one dense and two wide clusters
-    sizes = [n_normal // 3] * 3
-    z_normal = np.vstack([c + s * rng.normal(size=(n, latent_dim))
-                          for c, s, n in zip(centers, scales, sizes)])
-
-    def random_directions(n, k):
-        v = rng.normal(size=(n, k))
-        return v / np.linalg.norm(v, axis=1, keepdims=True)
-
-    # global: far away in the latent space plus strong isotropic noise
-    z_global = random_directions(n_global, latent_dim) * rng.uniform(8, 10, (n_global, 1))
-    # local: a shell of 4-6 sigma around the dense cluster, still much closer
-    # to it than the wide clusters are to their own centres
-    z_local = centers[0] + random_directions(n_local, latent_dim) * \
-        rng.uniform(4, 6, (n_local, 1)) * scales[0]
-    # subspace: ordinary latent position, but shifted off the manifold
-    pick = rng.integers(1, 3, n_subspace)
-    z_sub = centers[pick] + scales[pick, None] * rng.normal(size=(n_subspace, latent_dim))
-    offset = W_perp @ random_directions(n_subspace, dim - latent_dim).T * 2.5
-
-    X = np.vstack([z_normal, z_global, z_local, z_sub]) @ W.T
-    X += noise * rng.normal(size=X.shape)
-    X[n_normal:n_normal + n_global] += rng.normal(size=(n_global, dim))
-    X[-n_subspace:] += offset.T
-
-    types = np.array(["normal"] * n_normal + ["global"] * n_global
-                     + ["local"] * n_local + ["subspace"] * n_subspace)
-    y = (types != "normal").astype(int)
-    names = [f"x{i + 1:02d}" for i in range(dim)]
-    return X, y, names, types
-
-
-def make_synthetic_2d(seed=SYNTHETIC_SEED):
-    """Small 2-D analogue used only to visualise decision regions."""
-    rng = np.random.default_rng(seed)
-    dense = rng.normal([3.0, 3.0], 0.3, size=(150, 2))
-    wide = rng.normal([-2.0, -1.0], 1.3, size=(250, 2))
-    angle = rng.uniform(0, 2 * np.pi, 15)
-    local = np.c_[np.cos(angle), np.sin(angle)] * rng.uniform(1.3, 1.8, (15, 1)) + [3.0, 3.0]
-    glob = rng.uniform(-8, 8, size=(60, 2))
-    glob = glob[np.linalg.norm(glob - [-2.0, -1.0], axis=1) > 6][:15]
-    X = np.vstack([dense, wide, local, glob])
-    types = np.array(["normal"] * 400 + ["local"] * 15 + ["global"] * len(glob))
-    return X, (types != "normal").astype(int), types
-
-
-_RAW_LOADERS = {
-    "breast_cancer": _raw_breast_cancer,
-    "ionosphere": _raw_ionosphere,
-    "parkinsons": _raw_parkinsons,
-    "glass": _raw_glass,
-}
-
-
-def load_dataset(name, seed=0, contamination=TARGET_CONTAMINATION):
-    """Return the dataset framed for anomaly detection for a given run seed."""
-    if name == "synthetic":
-        X, y, names, types = make_synthetic()
-        return Dataset(name, X, y, names, types, "synthetic anomalies of three types")
-
-    X, y, names, description = _RAW_LOADERS[name]()
-    n_normal = int((y == 0).sum())
-    n_keep = int(round(contamination * n_normal / (1 - contamination)))
-    anomalies = np.flatnonzero(y == 1)
-    if len(anomalies) > n_keep:
-        rng = np.random.default_rng(seed)
-        anomalies = np.sort(rng.choice(anomalies, n_keep, replace=False))
-    keep = np.concatenate([np.flatnonzero(y == 0), anomalies])
-    keep.sort()
-    return Dataset(name, X[keep], y[keep], names, None, description)
-
+def load_dataset(name):
+    """Return X and y exactly as stored in the benchmark file."""
+    spec = SPECS[name]
+    X, y, names = _read(spec)
+    X, y = np.asarray(X, float), np.asarray(y).astype(int)
+    assert X.shape == (spec.n, spec.d), f"{name}: shape {X.shape}"
+    assert set(np.unique(y)) == {0, 1}, f"{name}: labels {np.unique(y)}"
+    assert int(y.sum()) == spec.anomalies, f"{name}: {int(y.sum())} anomalies"
+    assert not np.isnan(X).any(), f"{name}: missing values"
+    names = names or [f"x{i + 1:02d}" for i in range(X.shape[1])]
+    return Dataset(name, X, y, names)

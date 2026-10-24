@@ -235,3 +235,6 @@ data/
 *.fdb_latexmk
 *.xdv
 *.synctex.gz
+
+# Per-job caches of long experiments
+results/*/cache/

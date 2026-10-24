@@ -33,7 +33,8 @@ from common.protocol import SEEDS, make_experiment  # noqa: E402
 from task2_representations.representations import build as build_rep  # noqa: E402
 
 OUT = ROOT / "results" / "task2"
-N_JOBS = int(os.environ.get("N_JOBS", 6))
+N_JOBS = int(os.environ.get("N_JOBS", 3))  # each worker holds torch + numba (~1 GB)
+CACHE = OUT / "cache"
 
 
 def representation_grid(dim):
@@ -142,10 +143,19 @@ def run_job(dataset, seed):
     return rows, structure, embeddings, history
 
 
+def cached_job(dataset, seed):
+    """Run one (dataset, seed) job unless its result is already cached."""
+    path = CACHE / f"{dataset}_{seed}.pkl"
+    if not path.exists():
+        pd.to_pickle(run_job(dataset, seed), path)
+    return path
+
+
 def main():
-    OUT.mkdir(parents=True, exist_ok=True)
+    CACHE.mkdir(parents=True, exist_ok=True)
     jobs = [(d, s) for d in HIGHDIM_DATASETS for s in SEEDS]
-    results = Parallel(n_jobs=N_JOBS, verbose=5)(delayed(run_job)(d, s) for d, s in jobs)
+    paths = Parallel(n_jobs=N_JOBS, verbose=5)(delayed(cached_job)(d, s) for d, s in jobs)
+    results = [pd.read_pickle(p) for p in paths]
     pd.DataFrame([r for res in results for r in res[0]]).to_csv(OUT / "runs.csv", index=False)
     pd.DataFrame([r for res in results for r in res[1]]).to_csv(OUT / "structure.csv", index=False)
     pd.concat([e for res in results for e in res[2]]).to_csv(

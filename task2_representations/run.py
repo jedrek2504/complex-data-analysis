@@ -25,6 +25,7 @@ from sklearn.manifold import trustworthiness  # noqa: E402
 from sklearn.metrics import silhouette_score  # noqa: E402
 
 from common import ROOT  # noqa: E402
+from common.anomaly_types import anomaly_kind  # noqa: E402
 from common.datasets import HIGHDIM_DATASETS, load_dataset  # noqa: E402
 from common.detectors import build as build_detector  # noqa: E402
 from common.metrics import best_f1_threshold, evaluate, ranking_metrics  # noqa: E402
@@ -59,12 +60,17 @@ def detector_grid():
             yield "OCSVM", {"kernel": "rbf", "nu": nu, "gamma_factor": g}
 
 
-def _metrics_row(exp, s_val, s_test):
+def _metrics_row(exp, kinds, s_val, s_test):
     t = best_f1_threshold(exp.y_val, s_val)
     val = ranking_metrics(exp.y_val, s_val)
-    test = evaluate(exp.y_test, s_test, (s_test >= t).astype(int))
-    return {"val_roc_auc": val["roc_auc"], "val_pr_auc": val["pr_auc"],
-            **{f"test_{k}": v for k, v in test.items()}}
+    pred = (s_test >= t).astype(int)
+    test = evaluate(exp.y_test, s_test, pred)
+    row = {"val_roc_auc": val["roc_auc"], "val_pr_auc": val["pr_auc"],
+           **{f"test_{k}": v for k, v in test.items()}}
+    for kind in ("global", "local", "subspace"):  # recall per anomaly type
+        mask = kinds == kind
+        row[f"test_recall_{kind}"] = pred[mask].mean() if mask.any() else np.nan
+    return row
 
 
 def _warm_up_umap():
@@ -78,6 +84,7 @@ def run_job(dataset, seed):
     _warm_up_umap()
     exp = make_experiment(dataset, seed)
     types = load_dataset(dataset, seed).anomaly_type
+    kinds = anomaly_kind(dataset, seed)[exp.idx_test]
     rows, structure, embeddings, history = [], [], [], []
     for rep_kind, rep_params in representation_grid(exp.X_train.shape[1]):
         params = dict(rep_params)
@@ -105,7 +112,7 @@ def run_job(dataset, seed):
             s_va = rep.anomaly_score(exp.X_val)
             rows.append({**base, "detector": "Reconstruction", "det_params": "{}",
                          "det_fit_time": 0.0, "det_score_time": score_time,
-                         **_metrics_row(exp, s_va, s_te)})
+                         **_metrics_row(exp, kinds, s_va, s_te)})
 
         for det_kind, det_params in detector_grid():
             t0 = time.perf_counter()
@@ -117,7 +124,7 @@ def run_job(dataset, seed):
             rows.append({**base, "detector": det_kind,
                          "det_params": json.dumps(det_params, sort_keys=True),
                          "det_fit_time": fit_time, "det_score_time": score_time,
-                         **_metrics_row(exp, det.score(Z_va), s_te)})
+                         **_metrics_row(exp, kinds, det.score(Z_va), s_te)})
 
         if seed == 0 and Z_tr.shape[1] == 2:
             for part, Z, idx, y in (("train", Z_tr, exp.idx_train, exp.y_train),

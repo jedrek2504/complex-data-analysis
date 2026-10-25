@@ -9,6 +9,9 @@
 \usepackage{longtable}
 \usepackage{array}
 \usepackage{multirow}
+\usepackage{adjustbox}
+\usepackage{makecell}
+\usepackage{placeins}
 \usepackage{float}
 \usepackage[font=small,labelfont=bf]{caption}
 \usepackage{subcaption}
@@ -29,8 +32,12 @@
 \renewcommand{\arraystretch}{1.12}
 
 \newcommand{\tab}[1]{\input{\resultsdir/tables/#1}}
+% table scaled down to the text width only when it is wider
+\newcommand{\fittab}[1]{\adjustbox{max width=\textwidth}{\tab{#1}}}
 \newcommand{\fig}[1]{\resultsdir/figures/#1}
 \newcommand{\code}[1]{\texttt{#1}}
+% left-aligned paragraph column (no stretched spaces in narrow cells)
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
 
 % \maketitlepage{task title}{subtitle}
 \newcommand{\maketitlepage}[2]{%

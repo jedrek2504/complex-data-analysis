@@ -1,11 +1,11 @@
-\begin{tabular}{lrrrrrrrr}
+\begin{tabular}{lrrlrr}
 \toprule
-Zbiór & Udział anomalii & Acc. ``zawsze normalny'' & F1 / Recall & PR-AUC losowy & Acc. najlepszy (F1) & F1 najlepszy & Acc. najsłabszy (F1) & F1 najsłabszy \\
+Zbiór danych & \makecell[r]{Udział anomalii\\w teście} & \makecell[r]{Accuracy\\,,wszystko normalne''} & \makecell[l]{Najlepszy\\detektor (F1)} & \makecell[r]{Jego\\Accuracy} & \makecell[r]{Jego\\F1} \\
 \midrule
-Breastw & 0,351 & 0,649 & 0,000 / 0,000 & 0,351 & 0,960 (DBSCAN) & 0,944 & 0,539 (LOF) & 0,582 \\
-Mammography & 0,023 & 0,977 & 0,000 / 0,000 & 0,023 & 0,974 (DBSCAN) & 0,290 & 0,969 (COF) & 0,203 \\
-Wine & 0,091 & 0,909 & 0,000 / 0,000 & 0,091 & 0,957 (OCSVM) & 0,769 & 0,743 (COF) & 0,241 \\
-Statlog Heart & 0,050 & 0,950 & 0,000 / 0,000 & 0,050 & 0,889 (LOF) & 0,282 & 0,867 (IForest) & 0,167 \\
-Cardio & 0,096 & 0,904 & 0,000 / 0,000 & 0,096 & 0,946 (OCSVM) & 0,728 & 0,692 (COF) & 0,186 \\
+Breastw & 35,1\,\% & 0,649 & DBSCAN & 0,960 & 0,944 \\
+Mammography & 2,3\,\% & 0,977 & DBSCAN & 0,974 & 0,290 \\
+Wine & 9,1\,\% & 0,909 & OCSVM & 0,957 & 0,769 \\
+Statlog Heart & 5,0\,\% & 0,950 & LOF & 0,889 & 0,282 \\
+Cardio & 9,6\,\% & 0,904 & OCSVM & 0,946 & 0,728 \\
 \bottomrule
 \end{tabular}

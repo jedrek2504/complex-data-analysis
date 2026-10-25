@@ -130,7 +130,7 @@ pip install -r requirements.txt
 python -m task1_classical.eda
 python -m task1_classical.run_grid
 python -m task1_classical.run_best
-python -m task1_classical.decision_regions
+python -m task1_classical.detection_maps
 python -m task1_classical.analyze
 
 # Zadanie 2 (równolegle; liczbę procesów ustawia zmienna N_JOBS, domyślnie 3;

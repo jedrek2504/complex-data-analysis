@@ -1,6 +1,7 @@
 \documentclass[11pt,a4paper]{article}
 \newcommand{\resultsdir}{../../results/task1}
 \input{../common/preamble}
+\input{\resultsdir/tables/detected_counts}
 
 \begin{document}
 \maketitlepage{Zadanie 1}{Porównanie klasycznych metod detekcji wyjątków}
@@ -19,688 +20,683 @@ wykrywanych wyjątków, problemowi silnego niezbalansowania klas, różnicy
 między wyjątkami globalnymi i lokalnymi oraz zgodności zbiorów obserwacji
 wskazywanych przez poszczególne detektory.
 
-Eksperymenty przeprowadzono na pięciu zbiorach z publicznych benchmarków
-detekcji anomalii, dla 84 konfiguracji wymagających uczenia modelu
-(154 po uwzględnieniu wariantów progu \code{contamination}) i łącznie
+Eksperymenty przeprowadzono na pięciu zbiorach danych z publicznych
+benchmarków detekcji anomalii, dla 84 ustawień metod wymagających uczenia
+modelu (154 po uwzględnieniu parametru \code{contamination}, czyli
+zakładanego odsetka anomalii, opisanego w sekcji~\ref{sec:methods}) i łącznie
 90 podziałów danych (7560 wytrenowanych modeli). Cały kod znajduje się
-w katalogach \code{common/} i \code{task1\_classical/} repozytorium,
-a wszystkie tabele i wykresy raportu są generowane skryptami
-(sekcja~\ref{sec:repro}).
+w katalogach \code{common/} i \code{task1\_classical/} repozytorium.
 
+\FloatBarrier
 \section{Dane}
 
-\subsection{Zbiory benchmarkowe}
+W tej sekcji przedstawiono użyte zbiory danych i ich najważniejsze
+właściwości, które pomagają zrozumieć późniejsze wyniki.
 
-Użyto gotowych zbiorów z trzech benchmarków detekcji anomalii:
-ADBench~\cite{adbench}, ODDS~\cite{odds} i repozytorium DAMI~\cite{dami}.
-Macierz cech $X$ i etykiety $y$ ($y=1$ -- anomalia) są wczytywane dokładnie
-w postaci opublikowanej przez autorów benchmarków. \textbf{Etykiety anomalii
-pochodzą z tych zbiorów, a nie z tego projektu}: w kodzie nie są generowane,
-usuwane ani podpróbkowywane żadne obserwacje. Jedyne operacje na danych to
-podział warstwowy i standaryzacja dopasowana na części uczącej
-(sekcja~\ref{sec:protocol}). Zgodność plików sprawdzana jest sumami SHA256
-(\code{data/CHECKSUMS.txt}) oraz udokumentowanymi kształtami i liczbą anomalii.
+\FloatBarrier
+\subsection{Zbiory danych}
 
-\begin{itemize}
-  \item \textbf{Breastw} (ADBench, plik \code{4\_breastw.npz}) -- Breast Cancer
-  Wisconsin (Original) z UCI~\cite{uci,breastw}: 683 biopsje opisane 9 cechami
-  cytologicznymi w skali 1--10. Anomalie: guzy złośliwe (239, 35,0\,\%).
-  \item \textbf{Mammography} (ADBench, \code{23\_mammography.npz}) -- dane
-  z pracy Woods i in.~\cite{mammography} (zbiór spoza UCI, udostępniany
-  w ODDS i ADBench): 11\,183 obszary mammogramów opisane 6 cechami obrazu.
-  Anomalie: mikrozwapnienia (260, 2,3\,\%).
-  \item \textbf{Wine} (ADBench, \code{45\_wine.npz}) -- Wine z
-  UCI~\cite{uci,wine}: 13 wyników analizy chemicznej win. Autorzy ODDS
-  przyjęli klasy 2 i 3 jako normalne (119), a klasę 1, zredukowaną przez
-  nich do 10 obserwacji, jako anomalie (7,8\,\%).
-  \item \textbf{Statlog Heart} (DAMI, plik
-  \code{HeartDisease\_withoutdupl\_05\_v02.arff}) -- Statlog (Heart)
-  z UCI~\cite{uci,heart}: 13 cech klinicznych. W wersji DAMI bez duplikatów,
-  bez normalizacji, z 5\,\% anomalii (wariant v02): 150 osób zdrowych i 7 osób
-  z chorobą serca jako anomalie (4,5\,\%). Normalizację wykonujemy sami na
-  części uczącej.
-  \item \textbf{Cardio} (ADBench, \code{6\_cardio.npz}) -- Cardiotocography
-  z UCI~\cite{uci,cardio}: 1831 zapisów KTG opisanych 21 cechami. Klasa
-  normalna (1655) jest normalna, klasa patologiczna zredukowana przez autorów
-  ODDS do 176 obserwacji jest anomalią (9,6\,\%), klasa ,,podejrzana''
-  została przez nich pominięta.
-\end{itemize}
-
-Zbiory różnią się wielkością (od 129 do 11\,183 obserwacji) i udziałem
-anomalii (od 2,3 do 35\,\%). Breastw jest nietypowy: ponad jedna trzecia
-obserwacji to anomalie, więc tworzą one dużą, zwartą grupę, a nie rzadkie
-punkty. Wine i Statlog Heart mają tylko 10 i 7 anomalii, co ma konsekwencje
-dla protokołu (sekcja~\ref{sec:protocol}).
-
-\subsection{Wstępna analiza danych}
-
-Tabela~\ref{tab:eda} podsumowuje zbiory. Żaden nie zawiera braków danych.
-Cechy Breastw i Statlog Heart są całkowitoliczbowe (skale porządkowe, kody
-kategorii), a pozostałe w większości ciągłe. Mammography i Cardio mają silnie
-skośne rozkłady cech (średnia $|\gamma_1|$ odpowiednio 4,4 i 2,3;
-rys.~\ref{fig:skew}). Wszystkie zbiory poza Statlog Heart zawierają silnie
-skorelowane pary cech (maksymalna $|r|$ od 0,81 do 0,94), więc ich efektywna
-wymiarowość jest mniejsza od liczby cech. Odsetek wartości $|z|>3$
-(jednowymiarowe wartości odstające) wynosi 0,5--1,3\,\% i występują one
-także w klasie normalnej, więc reguły typu ,,3 sigma'' nie wystarczą do
-identyfikacji anomalii.
+Użyto pięciu gotowych zbiorów danych z benchmarków ADBench~\cite{adbench}
+i DAMI~\cite{dami} (tabela~\ref{tab:datasets}). Etykiety anomalii pochodzą
+od autorów benchmarków; zbiory nie były w żaden sposób zmieniane.
+Oryginalnym źródłem danych jest repozytorium UCI~\cite{uci,breastw,wine,heart,cardio},
+a w przypadku Mammography praca Woods i in.~\cite{mammography}.
 
 \begin{table}[H]
   \centering\small
-  \caption{Charakterystyka zbiorów. Glob./lok. -- liczba anomalii globalnych
-  i lokalnych wg definicji z sekcji~\ref{sec:kinds}; $\overline{|\gamma_1|}$ --
-  średnia bezwzględna skośność cech; $|z|>3$ -- odsetek wartości odstających
-  jednowymiarowo; max $|r|$ -- największa bezwzględna korelacja dwóch cech;
-  PC 90\,\% -- liczba składowych głównych wyjaśniających 90\,\% wariancji.}
-  \label{tab:eda}
-  \resizebox{\textwidth}{!}{\tab{eda_summary}}
+  \caption{Zbiory danych użyte w zadaniu.}
+  \label{tab:datasets}
+  \fittab{datasets}
 \end{table}
 
-Rysunek~\ref{fig:eda_pca} przedstawia rzut danych na dwie pierwsze składowe
-główne. W Breastw anomalie tworzą osobny, rozległy obszar. W Wine leżą na
-skraju chmury danych normalnych jako niewielkie skupisko. W Mammography
-i Cardio anomalie lokalne leżą na brzegu masy danych normalnych, a tylko
-nieliczne są wyraźnie oddalone. W Statlog Heart anomalie są wymieszane
-z danymi normalnymi. Potwierdza to rys.~\ref{fig:shift}: w Breastw wszystkie
-cechy mają duży efekt ($|d|>0{,}8$), w Wine i Cardio -- kilka cech,
-a w Statlog Heart i Mammography tylko pojedyncze cechy przekraczają tę granicę.
+Tabela~\ref{tab:samples} pokazuje, jak wyglądają dane: po jednej obserwacji
+normalnej i jednej anomalii z każdego zbioru danych (pierwsze pięć cech).
+W Mammography i Cardio autorzy benchmarku udostępnili cechy już
+przeskalowane i bez nazw, dlatego oznaczono je numerami.
+
+\begin{table}[H]
+  \centering\small
+  \setlength{\tabcolsep}{5pt}
+  \caption{Przykładowe obserwacje (pierwsze pięć cech; ,,\dots'' -- pozostałe cechy).}
+  \label{tab:samples}
+  \textbf{Breastw}\\[2pt]\fittab{sample_breastw}\\[6pt]
+  \textbf{Mammography}\\[2pt]\fittab{sample_mammography}\\[6pt]
+  \textbf{Wine}\\[2pt]\fittab{sample_wine}\\[6pt]
+  \textbf{Statlog Heart}\\[2pt]\fittab{sample_heart}\\[6pt]
+  \textbf{Cardio}\\[2pt]\fittab{sample_cardio}
+\end{table}
+
+\FloatBarrier
+\subsection{Wstępna analiza danych}
+
+Tu sprawdzono, jak rozkładają się cechy i czy anomalie odróżniają się od
+obserwacji normalnych już na pierwszy rzut oka. Żaden zbiór danych nie ma
+braków.
+
+\begin{table}[H]
+  \centering\small
+  \caption{Wskaźniki opisujące kształt danych.}
+  \label{tab:eda}
+  \fittab{eda_summary}
+\end{table}
+
+Znaczenie kolumn tabeli~\ref{tab:eda}:
+\begin{itemize}
+  \item \textbf{Średnia skośność cech} -- jak bardzo asymetryczne są rozkłady
+  cech (0 = symetryczny, powyżej 1 = silnie skośny, czyli z długim ,,ogonem''
+  dużych wartości).
+  \item \textbf{Wartości skrajne} -- odsetek wartości odległych od średniej
+  o więcej niż trzy odchylenia standardowe; takie wartości występują także
+  w obserwacjach normalnych.
+  \item \textbf{Najsilniejsza korelacja} -- największa zależność liniowa
+  między dwiema cechami (0 = brak, 1 = cechy są prawie swoimi kopiami).
+  \item \textbf{Składowe PCA na 90\,\% informacji} -- PCA (analiza składowych
+  głównych) zastępuje cechy ich kombinacjami uporządkowanymi od
+  najważniejszej; kolumna mówi, ile takich kombinacji wystarcza, by zachować
+  90\,\% zmienności danych.
+\end{itemize}
+Mammography i Cardio mają silnie skośne cechy, a w czterech zbiorach danych
+niektóre cechy są prawie duplikatami (korelacja 0,81--0,94).
+\textbf{Wniosek: danych nie da się opisać prostym rozkładem normalnym, a pojedyncze
+skrajne wartości nie wskazują jeszcze anomalii.}
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth]{\fig{eda_pca}}
-  \caption{Rzut zbiorów na dwie pierwsze składowe główne (dane
-  standaryzowane); kolor anomalii oznacza typ (globalne/lokalne).}
+  \caption{Rzut dwóch zbiorów danych na płaszczyznę dwóch pierwszych składowych PCA.}
   \label{fig:eda_pca}
 \end{figure}
+
+Na rysunku~\ref{fig:eda_pca} \textbf{anomalie Breastw tworzą osobny, duży obszar},
+a w Statlog Heart są wymieszane z obserwacjami normalnymi. Podział na anomalie
+globalne i lokalne wyjaśniono w sekcji~\ref{sec:kinds}.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth]{\fig{eda_feature_shift}}
-  \caption{Bezwzględna wartość $d$ Cohena (standaryzowana różnica średnich
-  anomalii i obserwacji normalnych) dla kolejnych cech; linia przerywana --
-  umowna granica dużego efektu (0,8).}
+  \caption{Jak mocno każda cecha osobno różni anomalie od obserwacji normalnych.}
   \label{fig:shift}
 \end{figure}
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.7\textwidth]{\fig{eda_skewness}}
-  \caption{Rozkład skośności cech w poszczególnych zbiorach.}
-  \label{fig:skew}
-\end{figure}
+Rysunek~\ref{fig:shift} pokazuje różnicę średnich anomalii i obserwacji
+normalnych, wyrażoną w odchyleniach standardowych (tzw. $d$ Cohena). W Breastw
+prawie wszystkie cechy przekraczają umowną granicę dużej różnicy (0,8), a
+w Statlog Heart i Mammography -- tylko pojedyncze. \textbf{Tam, gdzie żadna
+cecha osobno nie odróżnia anomalii, detektor musi patrzeć na wiele cech naraz.}
 
+\FloatBarrier
 \section{Protokół eksperymentalny}
 \label{sec:protocol}
 
-\begin{enumerate}
-  \item \textbf{Podział danych.} Dla każdego zbioru i ziarna $s$ dane dzielone
-  są warstwowo na część uczącą, walidacyjną i testową w proporcji
-  50/25/25\,\%. Te same ziarna dają te same podziały we wszystkich trzech
-  zadaniach.
-  \item \textbf{Liczba podziałów.} 10 podziałów (ziarna 0--9) dla Breastw,
-  Mammography i Cardio oraz 30 podziałów (ziarna 0--29) dla Wine i Statlog
-  Heart. W tych dwóch zbiorach część walidacyjna i testowa zawiera tylko
-  2--3 anomalie (Wine: 3 w części testowej, Statlog Heart: 2). Podział
-  warstwowy gwarantuje co najmniej jedną anomalię w każdej części, co jest
-  dodatkowo sprawdzane w kodzie. Pojedynczy podział jest jednak bardzo
-  zaszumiony, więc wynik uśredniono po trzykrotnie większej liczbie
-  podziałów.
-  \item \textbf{Przygotowanie.} Standaryzacja (\code{StandardScaler}) jest
-  dopasowywana wyłącznie do części uczącej i stosowana do pozostałych części.
-  \item \textbf{Uczenie.} Detektory uczone są \emph{bez etykiet} na części
-  uczącej, która zawiera anomalie w naturalnej proporcji (scenariusz
-  nienadzorowany). Każdy detektor zwraca wynik anomalii (wyższy = bardziej
-  anomalny) dla nowych obserwacji.
-  \item \textbf{Strojenie.} Etykiety części walidacyjnej służą do wyboru
-  konfiguracji (najwyższa średnia PR-AUC na walidacji, uśredniona po
-  podziałach) i progu decyzyjnego (maksymalizacja F1 na walidacji).
-  Część testowa służy wyłącznie do końcowej oceny.
-  \item \textbf{Metryki.} Precision, Recall, F1 (dla klasy ,,anomalia''),
-  ROC-AUC, PR-AUC (\emph{average precision}), Accuracy (tylko do
-  ilustracji jej wad) oraz czas uczenia i czas oceny części testowej.
-  Raportowane są średnie (i odchylenia standardowe) po podziałach.
-\end{enumerate}
+Ta sekcja opisuje, jak przygotowano eksperyment, żeby wyniki były uczciwe
+i porównywalne -- bez ,,podglądania'' danych, na których ocenia się metody.
 
-Dla metod z parametrem \code{contamination} (IForest, LOF, COF) parametr
-ten nie zmienia wyniku anomalii, a jedynie próg: oznaczane jest
-$c\cdot 100\,\%$ obserwacji uczących o najwyższym wyniku. Dlatego wszystkie
-wartości $c$ oceniane są na jednym wytrenowanym modelu. W przypadku OCSVM
-decyzja wynika z granicy SVM (sterowanej przez $\nu$), a w DBSCAN -- z
-promienia $\varepsilon$. W tabelach siatki (dodatek~\ref{app:grid}) Precision,
-Recall i F1 dotyczą tych ,,wbudowanych'' reguł decyzyjnych, a w porównaniu
-najlepszych konfiguracji (sekcja~\ref{sec:best}) -- progu wybranego na walidacji.
+\paragraph{Podział na trzy części.} Każdy zbiór danych dzielimy losowo na
+część uczącą (50\,\%), walidacyjną (25\,\%) i testową (25\,\%). Przykład:
+z 1000 obserwacji 500 trafia do uczenia, 250 do walidacji i 250 do testu.
+Każda część służy do czegoś innego:
+\begin{itemize}
+  \item \textbf{uczenie} -- detektor uczy się, jak wyglądają dane, \emph{bez}
+  informacji, które obserwacje są anomaliami (tak jak w praktyce, gdy etykiet
+  nie ma);
+  \item \textbf{walidacja} -- na niej wybieramy ustawienia metody
+  (hiperparametry) i próg decyzji ,,anomalia / nie anomalia'';
+  \item \textbf{test} -- oceniamy na nim wynik tylko raz, na końcu; nie
+  wpływa na żaden wybór.
+\end{itemize}
+Podział jest \emph{warstwowy}: w każdej części udział anomalii jest taki sam
+jak w całym zbiorze danych.
 
+\paragraph{Skalowanie tylko na części uczącej.} Cechy mają różne jednostki
+(np. wiek w latach i cholesterol w mg/dl), więc przed uczeniem każdą cechę
+standaryzujemy: odejmujemy średnią i dzielimy przez odchylenie standardowe.
+Średnią i odchylenie liczymy \emph{tylko} na części uczącej i tymi samymi
+liczbami przekształcamy walidację i test. Przykład: jeśli na części uczącej
+średni cholesterol to 250, a odchylenie 50, to wartość 300 w teście staje się
+$(300-250)/50=1$. Gdyby średnią liczyć na całych danych, informacja z testu
+wpłynęłaby na model.
+
+\paragraph{Ziarno losowe i wiele podziałów.} \emph{Ziarno} (ang.~seed) to
+liczba startowa generatora losowego: to samo ziarno daje zawsze ten sam
+podział. Jeden podział to loteria. Wine ma tylko 10 anomalii, więc
+w części testowej są 3, a Statlog Heart -- 2. Jedno trafienie więcej lub
+mniej zmienia wtedy wynik o kilkadziesiąt punktów procentowych. Dlatego:
+\begin{itemize}
+  \item Breastw, Mammography i Cardio dzielimy 10 razy (ziarna 0--9),
+  \item Wine i Statlog Heart -- 30 razy (ziarna 0--29),
+\end{itemize}
+a raportujemy średnią i odchylenie standardowe wyników z tych podziałów.
+Kod sprawdza, czy każda część zawiera co najmniej jedną anomalię, i odrzuca
+podział, który tego nie spełnia (przy podziale warstwowym taki przypadek
+nie wystąpił). Te same ziarna dają te same podziały w zadaniach 1--3, więc
+ich wyniki można porównywać.
+
+\paragraph{Wybór ustawień i progu.} Detektor daje każdej obserwacji
+\emph{wynik anomalii} -- liczbę, która jest tym większa, im bardziej obserwacja
+jest podejrzana. Spośród wszystkich ustawień metody wybieramy to, które ma
+najwyższą średnią PR-AUC na walidacji. PR-AUC (od 0 do 1) mówi, jak dobrze
+detektor ustawia anomalie na początku listy najbardziej podejrzanych
+obserwacji; dokładniej opisano ją w sekcji~\ref{sec:metrics}. Następnie na
+walidacji wybieramy próg wyniku, powyżej którego obserwację uznajemy za
+anomalię -- taki, który daje najwyższe F1 (miarę łączącą trafność zgłoszeń
+i odsetek wykrytych anomalii, też opisaną w sekcji~\ref{sec:metrics}).
+
+\FloatBarrier
 \section{Metody i badane hiperparametry}
+\label{sec:methods}
 
-\paragraph{Isolation Forest.} Las $T$ drzew dzielących dane losowymi cięciami
-losowych cech; wynik anomalii zależy od średniej głębokości, na której
-obserwacja zostaje odizolowana. Punkty odległe od masy danych izolowane są
-po niewielu cięciach. Metoda patrzy na dane \emph{globalnie} -- cięcia
-osiowe nie ,,widzą'' lokalnych różnic gęstości. Badano
-$T\in\{50,100,200,500\}$ i $c\in\{0{,}02;\,0{,}05;\,0{,}1;\,0{,}15;\,0{,}2;\,0{,}35\}$
-(wartość 0,35 odpowiada udziałowi anomalii w Breastw).
+Tabela~\ref{tab:methods} krótko opisuje, jak działa każda z pięciu metod,
+oraz jakie wartości jej parametrów sprawdzono.
 
-\paragraph{LOF.} Stosunek lokalnej gęstości osiągalności sąsiadów punktu do
-jego własnej gęstości. Wartości $\gg 1$ oznaczają punkt rzadszy niż jego
-otoczenie -- miara jest \emph{względna}, więc wykrywa wyjątki lokalne przy
-gęstych skupiskach. Badano $k\in\{5,10,20,35,50\}$ i te same wartości $c$.
-Użyto trybu \code{novelty=True}, który pozwala oceniać nowe dane.
-
-\paragraph{COF.} Wariant LOF, w którym gęstość zastąpiono \emph{spójnością}:
-średnia odległość łańcuchowa (\emph{average chaining distance}) wzdłuż
-ścieżki najbliższych połączeń (kolejność algorytmu Prima) w zbiorze $k$
-sąsiadów. COF lepiej niż LOF radzi sobie z wzorcami o niskiej gęstości,
-ale regularnej strukturze (np. punkty ułożone wzdłuż linii). Implementacja
-została napisana od podstaw (\code{common/cof.py}), bo dostępne
-implementacje nie oceniają nowych danych; zgodność z definicją sprawdzono
-na naiwnej implementacji referencyjnej (różnica 0). Siatka jak dla LOF.
-
-\paragraph{One-Class SVM.} Wyznacza w przestrzeni cech jądra hiperpłaszczyznę
-oddzielającą dane od początku układu z maksymalnym marginesem; $\nu$ jest
-górnym ograniczeniem odsetka punktów uczących poza granicą (i dolnym
-ograniczeniem odsetka wektorów nośnych). Badano jądra RBF, wielomianowe
-(stopnia 3), sigmoidalne i liniowe, $\nu\in\{0{,}01;\,0{,}05;\,0{,}1;\,0{,}2;\,0{,}5\}$
-oraz $\gamma\in\{0{,}1/d,\ 1/d,\ 10/d\}$ (50 konfiguracji).
-
-\paragraph{DBSCAN.} Punkty rdzeniowe mają co najmniej minPts sąsiadów
-w promieniu $\varepsilon$; punkty nieosiągalne z żadnego rdzenia są szumem
-(anomalią). Aby oceniać nowe dane, wynikiem anomalii jest odległość do
-najbliższego punktu rdzeniowego z części uczącej, a anomalią -- punkt, dla
-którego odległość ta przekracza $\varepsilon$. Ponieważ skala odległości
-zależy od wymiaru i zbioru, $\varepsilon$ ustalano jako kwantyl
-$q_\varepsilon\in\{0{,}5;\,0{,}75;\,0{,}9;\,0{,}95;\,0{,}99\}$ rozkładu
-odległości do minPts-tego sąsiada (heurystyka wykresu $k$-odległości),
-minPts $\in\{3,5,10,20\}$.
-
-\section{Wyniki}
-
-\subsection{Dlaczego Accuracy prowadzi do błędnych wniosków}
-
-Tabela~\ref{tab:acc} zestawia trywialny klasyfikator ,,zawsze normalny''
-z najlepszym i najsłabszym (wg F1) detektorem. Poza Breastw klasyfikator
-trywialny osiąga Accuracy 0,90--0,98, nie wykrywając \emph{żadnej} anomalii
-(Recall = F1 = 0). Na Mammography i Statlog Heart jego Accuracy (0,977
-i 0,955) jest \emph{wyższa} niż najlepszego detektora (0,974 i 0,889),
-choć ten wykrywa odpowiednio 23 i 48\,\% anomalii. Na Mammography różnica
-Accuracy między najlepszym a najsłabszym detektorem to 0,005, a w F1 --
-0,09. Przy udziale anomalii $\pi$ Accuracy jest zdominowana przez klasę
-normalną: wykrycie wszystkich anomalii zmienia ją o co najwyżej $\pi$.
-Dlatego w dalszej analizie podstawą są PR-AUC (której wartość dla losowego
-rankingu wynosi $\pi$, a nie 0,5 jak dla ROC-AUC) oraz F1.
+Trzy metody (IForest, LOF, COF) mają dodatkowo parametr \textbf{contamination}
+$c$, czyli \emph{zakładany odsetek anomalii}. Nie zmienia on samego modelu ani
+wyników anomalii -- przesuwa tylko próg: za anomalie uznaje się $c\cdot100\,\%$
+obserwacji uczących z najwyższym wynikiem. Przykład: przy $c=0{,}1$ detektor
+oznacza 10\,\% najbardziej podejrzanych obserwacji. Badano
+$c\in\{0{,}02;\ 0{,}05;\ 0{,}1;\ 0{,}15;\ 0{,}2;\ 0{,}35\}$; jego wpływ
+pokazano osobno w sekcji~\ref{sec:cont}.
 
 \begin{table}[H]
   \centering\small
-  \caption{Accuracy a jakość wykrywania anomalii (część testowa, średnie
-  po podziałach). ,,Losowy'' -- PR-AUC rankingu losowego (= udział anomalii).}
-  \label{tab:acc}
-  \resizebox{\textwidth}{!}{\tab{accuracy_trap}}
+  \caption{Metody i sprawdzone wartości parametrów.}
+  \label{tab:methods}
+  \begin{tabular}{L{2.1cm}L{7.6cm}L{5.2cm}}
+    \toprule
+    Metoda & Jak działa & Parametry (sprawdzone wartości) \\
+    \midrule
+    Isolation Forest (IForest) & Buduje wiele drzew, które dzielą dane losowymi
+    cięciami. Anomalię da się ,,odciąć'' od reszty po niewielu cięciach, więc
+    im krótsza ścieżka, tym bardziej podejrzany punkt. &
+    liczba drzew $T$: 50, 100, 200, 500; $c$ \\
+    \addlinespace
+    LOF & Porównuje gęstość punktu (jak blisko ma sąsiadów) z gęstością jego
+    sąsiadów. Punkt wyraźnie rzadszy niż jego otoczenie jest podejrzany,
+    nawet jeśli leży blisko innych danych. &
+    liczba sąsiadów $k$: 5, 10, 20, 35, 50; $c$ \\
+    \addlinespace
+    COF & Odmiana LOF: zamiast gęstości bada, jak ,,spójnie'' punkt łączy się ze
+    swoimi sąsiadami (łańcuch najbliższych połączeń). Implementacja własna,
+    bo dostępne biblioteki nie oceniają nowych punktów. &
+    liczba sąsiadów $k$: 5, 10, 20, 35, 50; $c$ \\
+    \addlinespace
+    One-Class SVM (OCSVM) & Wyznacza granicę wokół obszaru, w którym leży
+    większość danych; punkty poza granicą są anomaliami. Kształt granicy
+    zależy od \emph{jądra} -- funkcji mierzącej podobieństwo punktów. &
+    jądro: RBF (gaussowskie -- podobieństwo maleje z odległością), wielomianowe,
+    sigmoidalne, liniowe; $\nu$ (górny limit odsetka
+    punktów uczących poza granicą): 0,01; 0,05; 0,1; 0,2; 0,5;
+    $\gamma$ (szerokość jądra; większe = ciaśniejsza granica): 0,1/$d$, 1/$d$,
+    10/$d$, gdzie $d$ to liczba cech \\
+    \addlinespace
+    DBSCAN & Grupuje punkty leżące gęsto obok siebie. Punkt, który nie
+    należy do żadnej grupy, jest \emph{szumem}, czyli anomalią. Nowy punkt
+    jest szumem, gdy do najbliższego punktu z wnętrza grupy ma dalej niż
+    promień $\varepsilon$. &
+    minPts (ilu sąsiadów w promieniu $\varepsilon$ potrzeba, by punkt był
+    wnętrzem grupy): 3, 5, 10, 20; $\varepsilon$ ustalany jako kwantyl
+    $q_\varepsilon$ odległości do minPts-tego sąsiada: 0,5; 0,75; 0,9; 0,95;
+    0,99 \\
+    \bottomrule
+  \end{tabular}
 \end{table}
 
-\subsection{Wpływ hiperparametrów}
+Kwantyl $q_\varepsilon=0{,}9$ oznacza, że promień $\varepsilon$ jest taki, iż
+90\,\% punktów uczących ma minPts-tego sąsiada bliżej niż $\varepsilon$.
+Dzięki temu jedna siatka wartości pasuje do zbiorów danych o różnych skalach.
 
-\paragraph{Isolation Forest -- liczba drzew.} Liczba drzew praktycznie nie
-wpływa na średnią jakość (rys.~\ref{fig:iforest}; zmiany PR-AUC $\le 0{,}045$,
-największe na małych Wine i Statlog Heart, gdzie odchylenie między podziałami
-wynosi 0,15--0,25). Na Mammography większa liczba drzew zmniejsza wariancję między
-podziałami (odchylenie 0,066 dla 50 drzew i 0,045 dla 500). Ponieważ czas
-uczenia rośnie liniowo z $T$, 100--200 drzew jest rozsądnym kompromisem.
-Różnice między zbiorami są o rząd wielkości większe niż różnice wynikające
-z $T$, co pokazuje, że ograniczeniem IForest jest jego mechanizm, a nie
-liczba drzew.
+\FloatBarrier
+\section{Wyniki}
+
+W tej sekcji najpierw wyjaśniono miary jakości, potem omówiono każdą metodę
+osobno, a na końcu porównano metody ze sobą.
+
+\FloatBarrier
+\subsection{Miary jakości i pułapka Accuracy}
+\label{sec:metrics}
+
+Anomalii jest mało (od 2 do 35\,\% danych), więc popularna miara Accuracy
+myli. Tabela~\ref{tab:metric_def} wyjaśnia miary użyte w raporcie na
+przykładzie OCSVM na części testowej Cardio (458 obserwacji, w tym 44
+anomalie; detektor zgłosił 43 obserwacje, z czego 30 to prawdziwe anomalie).
+
+\begin{table}[H]
+  \centering\small
+  \caption{Miary jakości użyte w raporcie.}
+  \label{tab:metric_def}
+  \begin{tabular}{L{2.1cm}L{7.4cm}L{5.4cm}}
+    \toprule
+    Miara & Co mówi & Przykład (OCSVM, Cardio) \\
+    \midrule
+    Accuracy & odsetek wszystkich obserwacji ocenionych poprawnie &
+    $(458-13-14)/458=0{,}94$ \\
+    Precision & ile zgłoszonych obserwacji to naprawdę anomalie &
+    $30/43=0{,}70$ \\
+    Recall & ile prawdziwych anomalii wykryto & $30/44=0{,}68$ \\
+    F1 & jedna liczba łącząca Precision i Recall (ich średnia harmoniczna);
+    wysoka tylko wtedy, gdy obie są wysokie & $0{,}69$ \\
+    ROC-AUC & szansa, że losowa anomalia dostanie wyższy wynik niż losowa
+    obserwacja normalna; 0,5 = zgadywanie & 0,92 (średnio po podziałach) \\
+    PR-AUC & jak wysoko na liście najbardziej podejrzanych obserwacji są
+    anomalie, uśrednione po wszystkich progach; zgadywanie daje wynik równy
+    udziałowi anomalii & 0,76 (średnio po podziałach; zgadywanie: 0,10) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[H]
+  \centering\small
+  \caption{Detektor, który zawsze odpowiada ,,normalne'', ma wysoką Accuracy,
+  choć nie wykrywa niczego (jego F1 = 0).}
+  \label{tab:acc}
+  \fittab{accuracy_trap}
+\end{table}
+
+\textbf{Na Mammography i Statlog Heart odpowiedź ,,wszystko normalne'' ma
+wyższą Accuracy niż najlepszy detektor}, choć nie znajduje żadnej anomalii
+(tabela~\ref{tab:acc}). Dlatego metody porównujemy za pomocą PR-AUC i F1.
+ROC-AUC też bywa zbyt optymistyczna: na Mammography IForest ma ROC-AUC 0,85,
+ale F1 tylko 0,24, bo fałszywe alarmy giną wśród tysięcy obserwacji normalnych.
+
+\FloatBarrier
+\subsection{Wyniki poszczególnych detektorów}
+\label{sec:per_method}
+
+Każdą metodę omówiono w tym samym układzie: wpływ jej parametrów na
+wszystkich zbiorach danych, krótka tabela z ustawieniem wybranym na walidacji
+oraz rysunek pokazujący, co metoda wykryła w części testowej Cardio.
+
+Rysunki ,,co wykryto'' dotyczą jednego podziału (ziarno 0) części testowej
+Cardio, rzutowanej na dwie pierwsze składowe PCA. Ustawienie i próg
+detektora wybrano na walidacji. Kolory oznaczają: \textbf{TP} -- wykryta
+anomalia, \textbf{FN} -- przeoczona anomalia, \textbf{FP} -- fałszywy alarm
+(obserwacja normalna uznana za anomalię); szare punkty to obserwacje
+normalne, których detektor słusznie nie zgłosił.
+
+\FloatBarrier
+\subsubsection{Isolation Forest}
+
+Sprawdzono, czy liczba drzew $T$ zmienia jakość wykrywania.
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.85\textwidth]{\fig{iforest_estimators}}
-  \caption{Isolation Forest: średnia i rozrzut PR-AUC w zależności od liczby
-  drzew.}
+  \includegraphics[width=\textwidth]{\fig{iforest_trees}}
+  \caption{Isolation Forest: liczba drzew prawie nie zmienia PR-AUC.}
   \label{fig:iforest}
 \end{figure}
 
-\paragraph{LOF i COF -- liczba sąsiadów.} Wpływ $k$ jest silny i zależy od
-struktury anomalii (rys.~\ref{fig:knn}). W Wine PR-AUC LOF rośnie z 0,10
-($k=5$) do 0,49 ($k=20$): anomalie tworzą małe skupisko (ok. 5 punktów
-w części uczącej), więc przy $k=5$ sąsiadami anomalii są inne anomalie i jej
-gęstość względna wydaje się normalna (efekt maskowania). Dopiero $k$ większe
-niż rozmiar skupiska pozwala je wykryć. W Cardio, Mammography i Breastw
-jakość rośnie monotonicznie aż do $k=50$ (Cardio: 0,20 $\rightarrow$ 0,31),
-bo anomalie tworzą tam większe grupy. Skrajnym przypadkiem jest Breastw:
-239 anomalii tworzy własny gęsty obszar, a LOF i COF niezależnie od $k$
-osiągają PR-AUC tylko 0,29--0,43 przy bazowym 0,35. Guz złośliwy jest
-,,normalny'' względem innych guzów złośliwych, a metody lokalne porównują
-punkt właśnie z jego sąsiadami. COF jest prawie wszędzie słabszy od LOF
-(np. Cardio: 0,20 wobec 0,31) -- ścieżka łańcuchowa przy dużym $k$
-,,przechodzi'' przez sąsiednie skupiska i zaciera strukturę.
+\begin{table}[H]
+  \centering\small
+  \caption{Isolation Forest: ustawienie wybrane na walidacji i rozrzut wyników
+  między ustawieniami.}
+  \label{tab:p_iforest}
+  \fittab{param_IForest}
+\end{table}
+
+\textbf{Wszystkie zbiory danych: liczba drzew $T$ $\rightarrow$ zmiana PR-AUC
+najwyżej o 0,045.} IForest jest więc niewrażliwy na swój główny parametr;
+różnice między zbiorami danych (0,20 do 0,97) są wielokrotnie większe.
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=\textwidth]{\fig{neighbors_pr_auc}}
-  \caption{LOF i COF: PR-AUC (część testowa) w funkcji liczby sąsiadów;
-  pasy -- $\pm 1$ odchylenie standardowe między podziałami.}
-  \label{fig:knn}
+  \includegraphics[width=\textwidth]{\fig{detected_iforest}}
+  \caption{Co wykrył Isolation Forest na Cardio (\detIForest).}
+  \label{fig:det_iforest}
 \end{figure}
 
-\paragraph{Parametr \code{contamination}.} Parametr ten ustala odsetek
-oznaczanych obserwacji, a więc bezpośrednio steruje kompromisem
-Precision--Recall (rys.~\ref{fig:cont}). Dla IForest na Cardio wzrost $c$
-z 0,02 do 0,35 podnosi Recall z 0,17 do 0,995, a Precision spada z 0,84 do
-0,26. F1 jest największe w pobliżu rzeczywistego udziału anomalii: na Cardio
-($\pi=0{,}096$) przy $c=0{,}15$ (0,57), na Breastw ($\pi=0{,}35$) przy
-$c=0{,}35$ (0,93), na Mammography ($\pi=0{,}023$) przy $c=0{,}02$ (0,25).
-Ważna obserwacja: contamination \emph{nie zmienia} rankingu obserwacji
-(ROC-AUC i PR-AUC są stałe) -- zmienia tylko, ile najwyżej ocenionych punktów
-nazywamy anomaliami. Przyjęcie $c$ mniejszego od rzeczywistego udziału
-daje wysoką precyzję i niski Recall (detektor wskazuje tylko najbardziej
-oczywiste, zwykle globalne wyjątki), a większego -- odwrotnie. W praktyce
-$c$ jest nieznane, dlatego w porównaniu metod próg wyznaczano na walidacji.
+IForest wykrywa anomalie leżące daleko od masy danych (po lewej stronie
+rysunku~\ref{fig:det_iforest}), a \textbf{przeocza te, które leżą tuż przy
+obserwacjach normalnych}.
+
+\FloatBarrier
+\subsubsection{LOF}
+
+Sprawdzono, jak liczba sąsiadów $k$, z którymi LOF porównuje punkt, wpływa
+na wynik.
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=\textwidth]{\fig{contamination_effect}}
-  \caption{Precision i Recall (część testowa) w zależności od contamination
-  dla najlepszych (wg walidacji) wartości $T$ i $k$; linia przerywana --
-  rzeczywisty udział anomalii.}
-  \label{fig:cont}
+  \includegraphics[width=\textwidth]{\fig{lof_neighbors}}
+  \caption{LOF: większa liczba sąsiadów zwykle poprawia PR-AUC, najbardziej na Wine.}
+  \label{fig:lof}
 \end{figure}
-
-\paragraph{One-Class SVM.} Kluczowe okazały się jądro i $\gamma$
-(rys.~\ref{fig:ocsvm_heat} i~\ref{fig:ocsvm_kern}). Przy $\nu$ i $\gamma$
-wybranych na walidacji jądro RBF jest najlepsze na Breastw (PR-AUC 0,94)
-i Statlog Heart (0,42), a sigmoidalne -- na Wine (0,89), Cardio (0,76)
-i Mammography (0,22). Jądro liniowe (0,13--0,59) i wielomianowe (0,02--0,46)
-są słabe -- liniowa granica oddzielająca dane od początku układu nie może
-opisać skupisk ani obszarów niewypukłych, a jądro wielomianowe mocno zależy
-od skali danych. Sukces jądra sigmoidalnego jest empiryczny: nie jest ono
-dodatnio określone, więc wynik nie ma interpretacji granicy obszaru
-w przestrzeni Hilberta. Dla danych standaryzowanych przy $\nu=0{,}5$
-(we wszystkich trzech przypadkach) wynik zależy od iloczynów skalarnych
-z wieloma wektorami nośnymi i działa jak miara odchylenia od dominujących
-kierunków danych. Dla RBF $\gamma$ steruje ,,lokalnością'' granicy:
-$\gamma=10/d$ daje granicę ciasno opinającą dane i jest najlepsze dla
-Breastw (0,92 niezależnie od $\nu$), a $\gamma=0{,}1/d$ -- gładką granicę,
-najlepszą dla Cardio (0,60 przy $\nu=0{,}5$, wobec 0,26 przy $\gamma=10/d$).
-
-Parametr $\nu$ ogranicza odsetek \emph{uczących} punktów poza granicą, ale
-na nowych danych odsetek oznaczonych punktów może być znacznie większy
-(rys.~\ref{fig:ocsvm_nu}). Na małych Wine i Statlog Heart (64 i 78 punktów
-uczących, 13 cech) przy $\gamma=1/d$ OCSVM oznacza 41--46\,\% punktów
-testowych nawet dla $\nu=0{,}01$. Granica jest tak ciasno dopasowana do
-punktów uczących, że nowe punkty często leżą poza nią (nadmierne
-dopasowanie). Na większych Cardio i Mammography odsetek ten jest bliski
-$\nu$ dopiero od $\nu\approx 0{,}1$. Przy $\gamma=10/d$ wynik prawie nie
-zależy od $\nu$: jądro jest tak wąskie, że niemal każdy punkt staje się
-wektorem nośnym, a funkcja decyzyjna OCSVM sprowadza się do jądrowego
-estymatora gęstości (Parzena).
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth]{\fig{ocsvm_rbf_heatmap}}
-  \caption{OCSVM z jądrem RBF: PR-AUC (część testowa) w zależności od
-  $\nu$ i $\gamma$.}
-  \label{fig:ocsvm_heat}
-\end{figure}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.8\textwidth]{\fig{ocsvm_kernels}}
-  \caption{OCSVM: PR-AUC (część testowa) dla każdego jądra przy $\nu$
-  i $\gamma$ wybranych na walidacji.}
-  \label{fig:ocsvm_kern}
-\end{figure}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.85\textwidth]{\fig{ocsvm_nu}}
-  \caption{OCSVM (RBF, $\gamma=1/d$): odsetek oznaczonych punktów testowych
-  w funkcji $\nu$ (linia przerywana -- $y=\nu$) oraz kompromis
-  Precision--Recall przy zmianie $\nu$.}
-  \label{fig:ocsvm_nu}
-\end{figure}
-
-\paragraph{DBSCAN.} Rysunek~\ref{fig:dbscan} pokazuje, że w DBSCAN o
-wynikach decyduje przede wszystkim $\varepsilon$: odsetek punktów szumu
-maleje od 29--46\,\% dla $q_\varepsilon=0{,}5$ do 0,4--1,1\,\% dla
-$q_\varepsilon=0{,}99$. F1 osiąga maksimum, gdy odsetek szumu jest bliski
-udziałowi anomalii lub nieco większy: Breastw $q_\varepsilon=0{,}5$
-(szum 46\,\%, F1 = 0,89), Cardio $q_\varepsilon=0{,}75$ (18\,\%, 0,52),
-Mammography $q_\varepsilon=0{,}95$ (3\,\%, 0,26). Wpływ minPts najlepiej
-widać na Wine. Anomalie (ok. 5 punktów w części uczącej) tworzą małe
-skupisko, które przy minPts $\le 5$ staje się osobnym klastrem: punkty
-rdzeniowe są wtedy wśród anomalii i dla $q_\varepsilon\ge 0{,}75$ F1 spada
-do zera. Dopiero minPts = 10 lub 20 (więcej niż rozmiar skupiska) sprawia,
-że anomalie nie mogą utworzyć rdzenia i stają się szumem (F1 = 0,53--0,54
-przy $q_\varepsilon=0{,}5$). Wadą DBSCAN jest jeden globalny promień
-$\varepsilon$ -- nie da się dobrać go jednocześnie do gęstego i rzadkiego
-skupiska.
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth]{\fig{dbscan_heatmap}}
-  \caption{DBSCAN: F1 (górny wiersz) i odsetek punktów testowych uznanych
-  za szum (dolny wiersz) w zależności od minPts i kwantyla $q_\varepsilon$
-  wyznaczającego $\varepsilon$.}
-  \label{fig:dbscan}
-\end{figure}
-
-\subsection{Porównanie najlepszych konfiguracji}
-\label{sec:best}
-
-Tabela~\ref{tab:best} i rys.~\ref{fig:best} przedstawiają wyniki konfiguracji
-wybranych na walidacji, z progiem maksymalizującym F1 na walidacji.
 
 \begin{table}[H]
   \centering\small
-  \caption{Najlepsze konfiguracje (wybór na walidacji wg PR-AUC, próg
-  z walidacji wg F1); część testowa, średnia ($\pm$ odchylenie std.)
-  po podziałach (10 lub 30). Czas = uczenie + ocena części testowej.
-  Pogrubienie -- najlepsza metoda na zbiorze.}
+  \caption{LOF: ustawienie wybrane na walidacji i rozrzut wyników między ustawieniami.}
+  \label{tab:p_lof}
+  \fittab{param_LOF}
+\end{table}
+
+\textbf{Wine: liczba sąsiadów $k$ = 5 $\rightarrow$ 20 $\Rightarrow$ PR-AUC
+0,10 $\rightarrow$ 0,49.} Anomalie Wine tworzą małą grupę (ok. 5 punktów w
+części uczącej). Przy $k=5$ sąsiadami anomalii są inne anomalie, więc wyglądają
+normalnie; dopiero większe $k$ sięga do obserwacji normalnych. Na Breastw LOF
+jest słaby przy każdym $k$ (najwyżej 0,43 przy poziomie zgadywania 0,35), bo
+239 anomalii tworzy tam własny gęsty obszar.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{\fig{detected_lof}}
+  \caption{Co wykrył LOF na Cardio (\detLOF).}
+  \label{fig:det_lof}
+\end{figure}
+
+\textbf{LOF wykrywa prawie wszystkie anomalie (41 z 44), ale kosztem wielu
+fałszywych alarmów (119)} -- zgłasza każdy punkt, który jest rzadszy od
+swoich sąsiadów, także na obrzeżach danych normalnych.
+
+\FloatBarrier
+\subsubsection{COF}
+
+Jak w LOF, badanym parametrem jest liczba sąsiadów $k$.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{\fig{cof_neighbors}}
+  \caption{COF: wpływ liczby sąsiadów jest podobny jak w LOF, ale wyniki są niższe.}
+  \label{fig:cof}
+\end{figure}
+
+\begin{table}[H]
+  \centering\small
+  \caption{COF: ustawienie wybrane na walidacji i rozrzut wyników między ustawieniami.}
+  \label{tab:p_cof}
+  \fittab{param_COF}
+\end{table}
+
+\textbf{Wine: $k$ = 5 $\rightarrow$ 35 $\Rightarrow$ PR-AUC 0,07 $\rightarrow$
+0,28; na każdym zbiorze danych COF jest słabszy od LOF.} Łańcuch połączeń przy
+dużym $k$ przechodzi przez sąsiednie skupiska i zaciera lokalną strukturę.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{\fig{detected_cof}}
+  \caption{Co wykrył COF na Cardio (\detCOF).}
+  \label{fig:det_cof}
+\end{figure}
+
+\textbf{COF przeocza ponad połowę anomalii Cardio (30 z 44) i zgłasza 107
+fałszywych alarmów} -- jego wynik słabo odróżnia anomalie od zwykłych punktów
+brzegowych.
+
+\FloatBarrier
+\subsubsection{One-Class SVM}
+
+Sprawdzono trzy parametry: rodzaj jądra, szerokość jądra $\gamma$ i limit $\nu$.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{\fig{ocsvm_params}}
+  \caption{OCSVM: najważniejsze są rodzaj jądra (a) i szerokość jądra $\gamma$ (b).}
+  \label{fig:ocsvm}
+\end{figure}
+
+\begin{table}[H]
+  \centering\small
+  \caption{OCSVM: ustawienie wybrane na walidacji i rozrzut wyników między ustawieniami.}
+  \label{tab:p_ocsvm}
+  \fittab{param_OCSVM}
+\end{table}
+
+\begin{itemize}
+  \item \textbf{Jądro -- Wine: sigmoidalne $\Rightarrow$ PR-AUC 0,89 (RBF tylko
+  0,29).} Jądro RBF wygrywa na Breastw i Statlog Heart, sigmoidalne na Wine,
+  Cardio i Mammography, a liniowe i wielomianowe są zawsze słabe.
+  \item \textbf{$\gamma$ -- Breastw: wąskie jądro ($\gamma=10/d$) $\Rightarrow$
+  0,94; Cardio: szerokie ($\gamma=0{,}1/d$) $\Rightarrow$ 0,60 (przy $10/d$
+  tylko 0,26).} Wąskie jądro opina dane ciasno, szerokie daje gładką granicę;
+  który wariant jest lepszy, zależy od zbioru danych.
+  \item \textbf{$\nu$ -- Wine i Statlog Heart: nawet przy $\nu=0{,}01$ OCSVM
+  oznacza 41--46\,\% punktów testowych.} $\nu$ ogranicza odsetek punktów poza
+  granicą tylko na części uczącej; na małych zbiorach danych (64--78 punktów
+  uczących) granica jest tak ciasna, że nowe punkty często leżą poza nią.
+\end{itemize}
+Rozrzut w tabeli~\ref{tab:p_ocsvm} (np. Wine 0,07--0,89) pokazuje, że
+\textbf{OCSVM jest najbardziej wrażliwy na ustawienia ze wszystkich metod}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{\fig{detected_ocsvm}}
+  \caption{Co wykrył OCSVM na Cardio (\detOCSVM).}
+  \label{fig:det_ocsvm}
+\end{figure}
+
+\textbf{OCSVM ma najlepszą równowagę: wykrywa 30 z 44 anomalii przy tylko 13
+fałszywych alarmach.} Przeocza głównie anomalie leżące wewnątrz chmury
+obserwacji normalnych.
+
+\FloatBarrier
+\subsubsection{DBSCAN}
+
+DBSCAN jest algorytmem grupowania: dzieli dane na grupy (klastry) gęsto
+położonych punktów, a punkty, które nie pasują do żadnej grupy, nazywa
+szumem. To właśnie szum traktujemy jako anomalie. Sprawdzono wpływ promienia
+$\varepsilon$ (przez kwantyl $q_\varepsilon$) i parametru minPts.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{\fig{dbscan_params}}
+  \caption{DBSCAN: F1 jest najwyższe, gdy odsetek szumu jest bliski udziałowi anomalii.}
+  \label{fig:dbscan}
+\end{figure}
+
+\begin{table}[H]
+  \centering\small
+  \caption{DBSCAN: ustawienie wybrane na walidacji i rozrzut wyników między ustawieniami.}
+  \label{tab:p_dbscan}
+  \fittab{param_DBSCAN}
+\end{table}
+
+\textbf{Promień $\varepsilon$ decyduje o tym, ile punktów jest szumem, a F1 jest
+najlepsze, gdy szumu jest mniej więcej tyle, ile anomalii}: Breastw 44\,\%
+szumu przy 35\,\% anomalii (F1 0,89), Cardio 12\,\% przy 9,6\,\% (0,52),
+Mammography 2,5\,\% przy 2,3\,\% (0,26). minPts musi być większe niż grupka
+anomalii: na Wine walidacja wybiera minPts~$\ge 10$, bo przy mniejszym anomalie
+tworzą własną grupę i nie są szumem.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{\fig{dbscan_clusters}}
+  \caption{Grupy i szum znalezione przez DBSCAN w części testowej Cardio.}
+  \label{fig:dbscan_clusters}
+\end{figure}
+
+\begin{table}[H]
+  \centering\small
+  \caption{DBSCAN na części testowej Cardio: liczba punktów w grupie i w szumie.}
+  \label{tab:dbscan_clusters}
+  \tab{dbscan_clusters}
+\end{table}
+
+Z ustawieniem wybranym na walidacji (minPts = 20, $q_\varepsilon=0{,}5$)
+DBSCAN tworzy na Cardio \textbf{jedną dużą grupę, a 96 punktów zostaje szumem;
+24 z nich to prawdziwe anomalie} (tabela~\ref{tab:dbscan_clusters}). Szum
+obejmuje więc ponad połowę anomalii, ale też wiele punktów brzegowych.
+Rysunek ,,co wykryto'' (rys.~\ref{fig:det_dbscan}) używa progu wybranego na
+walidacji zamiast samego promienia $\varepsilon$, dlatego zgłasza mniej punktów.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{\fig{detected_dbscan}}
+  \caption{Co wykrył DBSCAN na Cardio (\detDBSCAN).}
+  \label{fig:det_dbscan}
+\end{figure}
+
+\textbf{DBSCAN wykrywa anomalie odległe od grupy, ale przeocza ponad połowę
+anomalii leżących przy jej brzegu} (24 z 44).
+
+\FloatBarrier
+\subsubsection{Próg contamination (IForest, LOF, COF)}
+\label{sec:cont}
+
+Parametr $c$ nie jest osobną metodą, tylko progiem: pokazano tu, jak jego
+wartość przesuwa równowagę między trafnością zgłoszeń a wykrywaniem anomalii.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{\fig{contamination_cardio}}
+  \caption{Cardio: większe $c$ to więcej wykrytych anomalii, ale mniej trafne zgłoszenia.}
+  \label{fig:cont}
+\end{figure}
+
+\begin{table}[H]
+  \centering\small
+  \caption{Wartość $c$ wybrana na walidacji (wg F1) i F1 na teście.}
+  \label{tab:cont}
+  \fittab{contamination}
+\end{table}
+
+\textbf{Cardio, IForest: $c$ = 0,02 $\rightarrow$ 0,35 $\Rightarrow$ Recall
+0,17 $\rightarrow$ 0,995, Precision 0,84 $\rightarrow$ 0,26.} Ranking
+obserwacji się nie zmienia, przesuwa się tylko próg. Wybrane na walidacji $c$
+jest zwykle bliskie prawdziwemu udziałowi anomalii (tabela~\ref{tab:cont});
+wyjątkiem są LOF i COF na Cardio, które przy słabym rankingu ,,łapią''
+anomalie dopiero przy bardzo wielu zgłoszeniach.
+
+\FloatBarrier
+\subsection{Porównanie najlepszych konfiguracji}
+
+Tu zestawiono wszystkie metody z ustawieniami i progami wybranymi na walidacji.
+
+\begin{table}[H]
+  \centering\small
+  \caption{Najlepsze ustawienia (wybrane na walidacji) -- wyniki na teście,
+  średnia $\pm$ odchylenie standardowe po podziałach; Czas -- uczenie i ocena
+  części testowej w milisekundach; pogrubienie -- najlepsza metoda na zbiorze danych.}
   \label{tab:best}
-  \resizebox{\textwidth}{!}{\tab{best_results}}
+  \fittab{best_results}
 \end{table}
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth]{\fig{best_comparison}}
-  \caption{PR-AUC i F1 najlepszych konfiguracji; słupki błędów --
-  odchylenie standardowe między podziałami.}
+  \caption{PR-AUC najlepszych ustawień każdej metody (kreska kropkowana -- poziom zgadywania).}
   \label{fig:best}
 \end{figure}
 
-Nie ma metody najlepszej na wszystkich zbiorach. OCSVM wygrywa na Cardio
-(PR-AUC 0,76, F1 0,73) i Wine (0,89; 0,77). DBSCAN wygrywa na Breastw
-(0,99; 0,94) i ma najwyższe PR-AUC i F1 na Mammography (0,23; 0,29),
-ale tam różnice między DBSCAN, OCSVM i IForest (0,21--0,23) mieszczą się
-w odchyleniu między podziałami. Na Statlog Heart wszystkie metody osiągają
-PR-AUC 0,39--0,44 przy odchyleniu 0,22--0,25, więc nie da się ich
-uporządkować. Metody lokalne (LOF, COF) są wyraźnie najsłabsze na Breastw
-i Cardio. Isolation Forest jest solidny, ale nigdzie nie wygrywa.
+\textbf{Żadna metoda nie wygrywa wszędzie}: OCSVM jest najlepszy na Cardio
+(0,76) i Wine (0,89), DBSCAN na Breastw (0,99) i Mammography (0,23), a na
+Statlog Heart wszystkie metody mają 0,39--0,44 przy odchyleniu ok. 0,24, więc
+nie da się ich uporządkować. LOF i COF są najsłabsze tam, gdzie anomalie
+tworzą duże skupisko (Breastw).
 
-Na tle wysokich ROC-AUC widać, dlaczego ROC-AUC jest metryką optymistyczną
-przy niezbalansowaniu. Na Mammography wszystkie metody mają ROC-AUC
-0,74--0,85, a PR-AUC tylko 0,11--0,23: IForest z ROC-AUC 0,85 osiąga
-F1 = 0,24, czyli przy progu z walidacji trzy na cztery zgłoszenia są
-fałszywe. Oś FPR na krzywej ROC jest normalizowana liczbą obserwacji
-normalnych (42 razy większą od liczby anomalii), więc dziesiątki fałszywych
-alarmów prawie nie obniżają ROC-AUC. PR-AUC i Precision bezpośrednio
-pokazują ten koszt. Na Statlog Heart ROC-AUC $\approx 0{,}8$ odpowiada
-PR-AUC $\approx 0{,}4$ przy bazowym 0,045 -- ranking jest znacznie lepszy od
-losowego, ale część testowa zawiera tylko dwie anomalie, więc F1 przyjmuje
-w pojedynczym podziale kilka możliwych wartości (odchylenie 0,20--0,26).
-
-Rozbieżność między siatką a wyborem na walidacji jest niewielka: dla 18
-z 25 par zbiór--metoda konfiguracja wybrana na walidacji jest też najlepsza
-na teście, a w pozostałych różnica PR-AUC nie przekracza 0,02 -- z wyjątkiem
-DBSCAN na Statlog Heart (najlepsza na teście 0,50, wybrana na walidacji 0,42).
-Część walidacyjna zawiera tam tylko 2 anomalie, więc wybór hiperparametrów
-jest zaszumiony. Raportowanie maksimum z siatki na zbiorze testowym
-zawyżałoby wyniki -- dlatego wszystkie porównania metod opierają się na
-wyborze walidacyjnym.
-
-\subsection{Wyjątki lokalne i globalne}
+\FloatBarrier
+\subsection{Anomalie lokalne i globalne}
 \label{sec:kinds}
 
-Benchmarki nie określają typu anomalii, więc przyjęto definicję operacyjną:
-anomalia jest \emph{globalna}, jeśli jej odporna odległość Mahalanobisa od
-klasy normalnej przekracza 99. percentyl odległości obserwacji normalnych,
-a w przeciwnym razie \emph{lokalna} (leży wewnątrz globalnej ,,otoczki''
-danych normalnych i odróżnia ją tylko sąsiedztwo). Kowariancję klasy
-normalnej szacowano estymatorem MCD. W Cardio, które ma liniowo zależne cechy
-(macierz kowariancji źle uwarunkowana), użyto estymatora Ledoita--Wolfa.
-Etykiety typów służą wyłącznie analizie -- nie zmieniają etykiet benchmarku.
-Większość anomalii jest w tym sensie lokalna (tabela~\ref{tab:eda}):
-93\,\% w Mammography, 90\,\% w Wine, 86\,\% w Statlog Heart i 65\,\%
-w Cardio. Wyjątkiem jest Breastw (34\,\% lokalnych).
+Ta część sprawdza, czy metody różnią się tym, \emph{jakie} anomalie wykrywają.
 
-Rysunek~\ref{fig:regions} pokazuje obszary decyzyjne w dwuwymiarowym rzucie
-części uczącej Cardio na dwie pierwsze składowe główne. Wszystkie metody
-oznaczają 10\,\% punktów, co odpowiada udziałowi anomalii w Cardio.
-IForest, OCSVM i DBSCAN wyznaczają \emph{jeden} zwarty obszar normalności
-wokół masy danych. LOF i COF tworzą postrzępioną granicę, która oznacza
-także luki wewnątrz chmury i obrzeża mniejszych zgęszczeń. Rzut zachowuje
-jednak tylko część struktury 21-wymiarowych danych: wiele anomalii
-lokalnych leży w nim wewnątrz chmury danych normalnych, a nawet najlepszy
-w tym rzucie IForest osiąga F1 = 0,43. Rysunek ilustruje więc kształt
-granic poszczególnych metod, a nie ich skuteczność w pełnej przestrzeni.
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth]{\fig{decision_regions_2d}}
-  \caption{Obszary uznane za anomalne (kolor jasnopomarańczowy) w rzucie
-  części uczącej Cardio (podział 0) na dwie pierwsze składowe główne;
-  detektory uczone w tym rzucie. Kolor punktów -- typ anomalii wyznaczony
-  w pełnej przestrzeni cech. R$_{lok}$, R$_{glob}$ -- Recall anomalii
-  lokalnych i globalnych.}
-  \label{fig:regions}
-\end{figure}
-
-W pełnej przestrzeni (tabela~\ref{tab:kinds}, rys.~\ref{fig:kinds})
-anomalie globalne są wykrywane prawie w całości przez wszystkie metody
-(Recall 0,89--1,00; jedynym wyjątkiem jest COF na Cardio, 0,59).
-O jakości decydują anomalie lokalne. Na Cardio najlepiej wykrywa je LOF
-(Recall 0,79), wyraźnie przed OCSVM (0,66) i IForest (0,60), a DBSCAN i COF
-wykrywają je słabo (0,31 i 0,30). Na Statlog Heart LOF również prowadzi
-(0,39). Na Wine i Mammography najwięcej anomalii lokalnych wykrywa OCSVM
-(0,74 i 0,27). W Mammography wszystkie metody wykrywają mniej niż 30\,\%
-anomalii lokalnych, które stanowią 93\,\% anomalii tego zbioru. To wyjaśnia
-niskie PR-AUC wszystkich metod na Mammography. Na Breastw podział na
-globalne i lokalne traci znaczenie: progi są tak niskie (35\,\% anomalii),
-że oba typy są wykrywane w 87--100\,\%. W Wine i Statlog Heart anomalii
-globalnych jest tylko 6 i 9 (suma po wszystkich częściach testowych), więc
-dla tych zbiorów Recall globalnych należy traktować orientacyjnie.
+Benchmarki nie mówią, czy anomalia jest ,,daleko od wszystkiego'', czy tylko
+,,nie pasuje do sąsiadów'', więc przyjęto własną definicję. Dla każdej anomalii
+liczymy jej odległość od środka obserwacji normalnych w sposób, który
+uwzględnia zależności między cechami i nie daje się zaburzyć skrajnym
+punktom (\emph{odporna odległość Mahalanobisa}). Anomalia jest
+\textbf{globalna}, jeśli leży dalej niż 99\,\% obserwacji normalnych, a
+\textbf{lokalna} -- jeśli leży wewnątrz ich obszaru. Przykład: pacjent
+z ciśnieniem 250 przy normie 120--140 to anomalia globalna; pacjent
+o typowych wartościach każdej cechy, ale nietypowym ich połączeniu -- lokalna.
 
 \begin{table}[H]
   \centering\small
-  \caption{Recall według typu anomalii (część testowa; $n$ -- liczba anomalii
-  danego typu zsumowana po częściach testowych wszystkich podziałów).}
+  \caption{Procent wykrytych anomalii globalnych i lokalnych (Liczba -- anomalie
+  danego typu zsumowane po częściach testowych wszystkich podziałów).}
   \label{tab:kinds}
-  \tab{recall_by_kind}
+  \fittab{recall_by_kind}
 \end{table}
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth]{\fig{recall_by_kind}}
-  \caption{Recall według typu anomalii dla najlepszych konfiguracji.}
+  \caption{Anomalie globalne wykrywają wszystkie metody, lokalne -- tylko niektóre.}
   \label{fig:kinds}
 \end{figure}
 
-\subsection{Zgodność zbiorów wykrytych wyjątków}
+\textbf{Anomalie globalne wykrywa prawie każda metoda (89--100\,\%), a różnice
+dotyczą lokalnych}: na Cardio LOF wykrywa ich 79\,\%, OCSVM 66\,\%, IForest
+60\,\%, a DBSCAN i COF ok. 30\,\%. Na Mammography, gdzie 93\,\% anomalii jest
+lokalnych, żadna metoda nie przekracza 27\,\%, co tłumaczy niskie wyniki na
+tym zbiorze danych.
 
-Zgodność zbiorów obserwacji oznaczonych przez detektory zmierzono
-indeksem Jaccarda $J(A,B)=|A\cap B|/|A\cup B|$ (rys.~\ref{fig:jac}, średnia
-po podziałach). Średnia zgodność par wynosi 0,62 w Breastw, ale tylko
-0,28--0,38 w pozostałych zbiorach -- gdy problem jest trudny, detektory
-wskazują różne obserwacje. Wyraźnie widać dwie rodziny metod. Metody
-globalne IForest, OCSVM i DBSCAN są ze sobą zgodne (Breastw 0,89--0,92,
-Cardio 0,50--0,55), a lokalne LOF i COF -- ze sobą (Breastw 0,78,
-Mammography 0,49). Między rodzinami zgodność jest niska (Breastw 0,42--0,48,
-Cardio 0,14--0,43). Zgodność odzwierciedla więc mechanizm metody bardziej
-niż jej jakość.
+\FloatBarrier
+\subsection{Zgodność wykrytych zbiorów}
+
+Tu sprawdzono, czy różne metody wskazują te same obserwacje.
+
+Zgodność mierzymy \emph{indeksem Jaccarda}: liczba obserwacji wskazanych
+przez obie metody podzielona przez liczbę obserwacji wskazanych przez
+którąkolwiek z nich (1 = te same punkty, 0 = zupełnie różne).
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth]{\fig{jaccard_heatmap}}
-  \caption{Indeks Jaccarda zbiorów obserwacji testowych oznaczonych jako
-  anomalie przez pary detektorów (średnia po podziałach).}
+  \caption{Metody tworzą dwie rodziny, które wskazują różne obserwacje.}
   \label{fig:jac}
 \end{figure}
 
-Rysunek~\ref{fig:overlap} pokazuje, iloma detektorami wskazywana jest
-każda prawdziwa anomalia i każdy fałszywy alarm. W Breastw 83\,\% anomalii
-wskazują wszystkie pięć metod i żadna nie zostaje pominięta przez
-wszystkie. W pozostałych zbiorach zgodnie wskazywanych jest tylko
-10--27\,\% anomalii, a żaden detektor nie wykrywa 3\,\% anomalii Cardio,
-7\,\% Wine, 43\,\% Statlog Heart i 58\,\% Mammography. Tych obserwacji
-nie uratuje żadna kombinacja detektorów. Fałszywe alarmy są natomiast
-w dużej mierze \emph{indywidualne}: 42--59\,\% fałszywych alarmów zgłasza
-tylko jeden detektor (poza Breastw, 31\,\%). Anomalie wykrywane wyłącznie
-przez jedną metodę to głównie trafienia LOF (30 przypadków w Cardio)
-i OCSVM (39 w Mammography, 14 w Cardio, 11 w Wine). Ta asymetria -- błędy
-indywidualne, część trafień unikatowa -- jest przesłanką, że łączenie
-detektorów może poprawić jakość; zostanie to zbadane w zadaniu 3.
+\textbf{IForest, OCSVM i DBSCAN wskazują w dużej mierze te same punkty
+(Breastw: 0,89--0,92), a LOF i COF -- inne (z rodziną IForest tylko
+0,42--0,48).} Pierwsza rodzina patrzy na dane całościowo, druga porównuje
+punkt z sąsiadami. Na Cardio zgodność jest niższa (0,14--0,55), więc metody
+częściej popełniają różne błędy.
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth]{\fig{detector_overlap}}
-  \caption{Rozkład liczby detektorów (spośród 5) wskazujących prawdziwe
-  anomalie (lewo) oraz fałszywe alarmy wskazane przez co najmniej jeden
-  detektor (prawo); część testowa, wszystkie podziały.}
-  \label{fig:overlap}
-\end{figure}
+\FloatBarrier
+\subsection{Jakość a czas działania}
 
-\subsection{Kompromis jakość -- czas}
-
-Rysunek~\ref{fig:time} zestawia czas (uczenie + ocena części testowej)
-z PR-AUC dla wszystkich konfiguracji. Na małych zbiorach (Wine, Statlog
-Heart; ok. 70 punktów uczących) OCSVM i LOF potrzebują 1--2~ms, a Isolation
-Forest ok. 145~ms. Jego koszt zależy głównie od liczby drzew, a każde drzewo
-budowane jest na podpróbce 256 punktów, więc prawie nie zależy od $n$.
-Wraz z rozmiarem danych proporcje się odwracają. Mediana czasu OCSVM rośnie
-z 3~ms (Breastw, 341 punktów uczących) przez 17~ms (Cardio, 915) do 246~ms
-(Mammography, 5591; maksimum 1,7~s), czyli szybciej niż liniowo, zgodnie
-ze złożonością $O(n^2)$--$O(n^3)$ rozwiązania problemu kwadratowego.
-IForest w tym samym zakresie zmienia się tylko z 158 do 214~ms. COF jest
-najwolniejszy na większych zbiorach (mediana 343~ms na Mammography), bo dla
-każdego punktu buduje ścieżkę łańcuchową w czasie $O(k^2)$. LOF (120~ms)
-i DBSCAN (252~ms) wymagają wyszukiwania sąsiadów. W badanym zakresie
-najkorzystniejszy stosunek jakości do czasu ma OCSVM na zbiorach
-do kilku tysięcy obserwacji. Przy dziesiątkach tysięcy obserwacji przewagę
-zyskuje IForest (por. pomiary dla Campaign w zadaniu 2).
+Ta część porównuje czas uczenia i oceny z jakością na małym i na dużym zbiorze danych.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth]{\fig{time_vs_quality}}
-  \caption{Czas uczenia i oceny a PR-AUC (część testowa) dla wszystkich
-  konfiguracji siatki (średnie po podziałach).}
+  \caption{Na małym zbiorze danych najszybsze są OCSVM i LOF, na dużym ich przewaga znika.}
   \label{fig:time}
 \end{figure}
 
-\section{Dyskusja}
+\textbf{Na Wine OCSVM i LOF działają w ok. 1--2~ms, a IForest ok. 145~ms;
+na Mammography mediana czasu OCSVM rośnie do ok. 250~ms (maksymalnie 1,7~s),
+a IForest prawie się nie zmienia (ok. 210~ms).} Koszt OCSVM rośnie szybciej niż
+liczba obserwacji, a IForest buduje każde drzewo na stałej próbce 256 punktów,
+więc przy dużych zbiorach danych zyskuje przewagę.
 
-\paragraph{Dlaczego algorytmy zachowują się inaczej?} Różnice wynikają
-z tego, \emph{co} każda metoda uznaje za nietypowe.
-\begin{itemize}
-  \item \textbf{Isolation Forest} mierzy łatwość izolacji osiowymi cięciami
-  w skali całego zbioru. Jest skuteczny, gdy anomalie odstają globalnie lub
-  w pojedynczych cechach (Breastw: 0,97), i stabilny względem
-  hiperparametrów, ale słabszy dla anomalii lokalnych (Cardio: Recall
-  lokalnych 0,60 wobec 0,79 dla LOF).
-  \item \textbf{LOF} porównuje gęstość punktu z gęstością sąsiadów, więc
-  najlepiej wykrywa wyjątki lokalne (Cardio, Statlog Heart). Zawodzi, gdy
-  anomalii jest dużo i tworzą własny gęsty obszar (Breastw: 0,43) -- wtedy
-  założenie ,,anomalia jest rzadsza od sąsiadów'' nie jest spełnione.
-  Za małe $k$ prowadzi do maskowania małych skupisk anomalii (Wine).
-  \item \textbf{COF} zastępuje gęstość spójnością ścieżki; w danych
-  bez wyraźnych struktur liniowych daje wyniki gorsze niż LOF, a jest
-  najwolniejszy.
-  \item \textbf{OCSVM} wyznacza jedną granicę dla całego zbioru; przy
-  dobrze dobranym jądrze i $\gamma$ jest najlepszy na Cardio i Wine, ale
-  wynik silnie zależy od jądra i $\gamma$, a na małych zbiorach granica
-  nadmiernie dopasowuje się do punktów uczących.
-  \item \textbf{DBSCAN} daje wysoką precyzję, gdy anomalie są wyraźnie
-  oddzielone (Breastw: 0,93), bo za szum uznaje tylko punkty rzeczywiście
-  odizolowane. Jeden globalny promień nie pasuje jednak jednocześnie do
-  skupisk o różnej gęstości (Recall lokalnych w Cardio 0,31), a minPts musi
-  przekraczać rozmiar skupisk anomalii.
-\end{itemize}
-
-\paragraph{Wpływ parametrów na rodzaj wykrywanych wyjątków.} Parametry
-progowe (contamination, $\nu$, $\varepsilon$) decydują o \emph{liczbie}
-wykrywanych wyjątków i przesuwają kompromis Precision--Recall. Ich
-zmniejszanie sprawia, że detektor zgłasza tylko najbardziej oczywiste,
-zwykle globalne wyjątki. Parametry kształtujące wynik ($k$ w LOF/COF,
-$\gamma$ i jądro w OCSVM, minPts w DBSCAN) decydują o \emph{rodzaju}
-wykrywanych wyjątków -- o skali, na której definiowana jest ,,normalność''.
-Małe $k$ lub duże $\gamma$ czynią detektor lokalnym (wykrywa odchylenia
-od najbliższego otoczenia, ale też maskuje małe skupiska anomalii), a duże
-$k$ lub małe $\gamma$ -- globalnym.
-
-\paragraph{Interpretacja metryk przy niezbalansowaniu.} Przy 2--10\,\%
-anomalii Accuracy jest bezużyteczna (tabela~\ref{tab:acc}), a ROC-AUC
-optymistyczna, bo fałszywe alarmy są normalizowane dużą liczbą obserwacji
-normalnych (Mammography: ROC-AUC 0,85 przy F1 0,24). PR-AUC odnosi się do
-bazowego poziomu $\pi$ i bezpośrednio uwzględnia koszt fałszywych alarmów,
-dlatego użyto jej do wyboru konfiguracji. Precision i Recall zależą od
-progu, więc porównując metody trzeba ustalić wspólną regułę wyboru progu
-(tu: maksymalizacja F1 na walidacji). F1 traktuje oba rodzaje błędów
-symetrycznie; w zastosowaniach (np. diagnostyka) należałoby dobrać próg do
-kosztu pominięcia anomalii.
-
-\paragraph{Ograniczenia.}
-\begin{itemize}
-  \item Małe liczby anomalii: części testowe Wine i Statlog Heart zawierają
-  3 i 2 anomalie, części walidacyjne -- 2--3. Wybór hiperparametrów i progu
-  jest więc obarczony dużą wariancją (odchylenie F1 0,19--0,26). Trzykrotnie
-  większa liczba podziałów (30) zmniejsza niepewność średniej, ale nie
-  zmniejsza zmienności pojedynczego wyniku; wniosków o kolejności metod na
-  tych zbiorach nie należy wyciągać.
-  \item Etykiety benchmarków są przyjęte bez zmian. Klasa uznana przez autorów
-  benchmarku za anomalię nie musi być ,,wyjątkiem'' w sensie rozkładu
-  (Statlog Heart, Mammography). Ocena mierzy wtedy zgodność anomalii
-  statystycznych z tą klasą, a nie jakość detektora w ogóle. Breastw z 35\,\%
-  anomalii jest raczej problemem dwóch skupisk niż detekcji rzadkich zdarzeń.
-  \item Podział anomalii na globalne i lokalne opiera się na przyjętej
-  definicji (MCD lub Ledoit--Wolf, 99. percentyl); inna definicja zmieniłaby
-  proporcje typów.
-  \item Siatki hiperparametrów są skończone; DBSCAN był parametryzowany
-  kwantylem $\varepsilon$, a OCSVM -- względnym $\gamma$.
-\end{itemize}
-
-\paragraph{Kierunki dalszych badań.} Analiza wpływu reprezentacji danych
-(zadanie 2), łączenie detektorów, które -- jak pokazała analiza zgodności --
-należą do dwóch rodzin i popełniają w dużej mierze różne błędy (zadanie 3),
-oraz metody półnadzorowane wykorzystujące niewielką liczbę etykiet
-z walidacji.
-
+\FloatBarrier
 \section{Wnioski}
 
+Najważniejsze wnioski z zadania, każdy poparty liczbami z sekcji~5.
+
 \begin{enumerate}
-  \item Żadna metoda nie dominuje: OCSVM jest najlepszy na Cardio (PR-AUC
-  0,76) i Wine (0,89), DBSCAN na Breastw (0,99) i Mammography (0,23), a na
-  Statlog Heart metody są nierozróżnialne. LOF i COF są wyraźnie najsłabsze
-  tam, gdzie anomalie tworzą duże skupiska (Breastw).
-  \item O tym, \emph{jakie} wyjątki są wykrywane, decyduje mechanizm metody:
-  anomalie globalne wykrywają prawie w całości wszystkie metody, a różnice
-  dotyczą anomalii lokalnych. Tu LOF prowadzi na Cardio (Recall 0,79 wobec
-  0,30--0,66), a DBSCAN i COF są najsłabsze. Metody dzielą się na dwie
-  rodziny (globalną i lokalną), co widać w zgodności ich decyzji.
-  \item Najważniejsze hiperparametry to $k$ (LOF/COF), $\gamma$ i jądro (OCSVM)
-  oraz $\varepsilon$ i minPts (DBSCAN); liczba drzew w IForest ma znikomy
-  wpływ. Contamination, $\nu$ i $\varepsilon$ sterują kompromisem
-  Precision--Recall, a F1 jest największe, gdy odsetek oznaczonych punktów
-  jest bliski udziałowi anomalii.
-  \item Przy niezbalansowaniu Accuracy jest myląca (trywialny klasyfikator
-  bywa lepszy od najlepszego detektora), a ROC-AUC optymistyczna; podstawą
-  oceny powinny być PR-AUC i F1.
-  \item Część trafień jest unikatowa dla jednej metody, a fałszywe alarmy są
-  w dużej mierze indywidualne -- to przesłanka do budowy zespołu detektorów
-  (zadanie 3).
-  \item Jakość detekcji bardziej zależy od zbioru (tego, czy anomalie są
-  wyjątkami w sensie rozkładu) niż od wyboru algorytmu: rozrzut PR-AUC
-  między zbiorami (0,11--0,99) jest kilkukrotnie większy niż między
-  najlepszymi metodami na tym samym zbiorze.
+  \item \textbf{Żadna metoda nie jest najlepsza wszędzie.} OCSVM wygrywa na
+  Cardio (PR-AUC 0,76) i Wine (0,89), DBSCAN na Breastw (0,99) i Mammography
+  (0,23).
+  \item \textbf{Największy wpływ ma dopasowanie metody do typu anomalii.}
+  Anomalie globalne wykrywa każda metoda (89--100\,\%); o wyniku decydują
+  lokalne, które najlepiej wykrywa LOF (Cardio: 79\,\% wobec ok. 30\,\% dla
+  DBSCAN i COF). Gdy anomalie tworzą duże skupisko (Breastw), LOF i COF
+  zawodzą (0,43 i 0,35).
+  \item \textbf{Parametry są równie ważne jak wybór metody, ale nie we
+  wszystkich metodach.} OCSVM na Wine daje od 0,07 do 0,89 PR-AUC zależnie od
+  jądra i $\gamma$, LOF od 0,10 do 0,49 zależnie od $k$, a Isolation Forest
+  zmienia się najwyżej o 0,045 -- jest najbezpieczniejszy bez strojenia.
+  \item \textbf{Parametry progowe ($c$, $\nu$, $\varepsilon$) ustalają liczbę
+  zgłoszeń, a nie jakość rankingu.} Najlepsze F1 uzyskuje się, gdy odsetek
+  zgłoszeń jest bliski prawdziwemu udziałowi anomalii.
+  \item \textbf{Accuracy nie nadaje się do oceny.} Na Mammography i Statlog
+  Heart odpowiedź ,,wszystko normalne'' ma wyższą Accuracy niż najlepszy
+  detektor; podstawą oceny powinny być PR-AUC i F1.
+  \item \textbf{Metody tworzą dwie rodziny}: globalną (IForest, OCSVM, DBSCAN)
+  i lokalną (LOF, COF), które wskazują różne obserwacje -- to przesłanka do
+  łączenia detektorów w zadaniu~3.
+  \item \textbf{Przy kilku anomaliach w teście metod nie da się porównać}:
+  na Statlog Heart wszystkie mają 0,39--0,44 PR-AUC przy odchyleniu ok. 0,24
+  mimo 30 podziałów.
 \end{enumerate}
 
-\section{Odtworzenie wyników}
-\label{sec:repro}
-
-\begin{verbatim}
-python -m task1_classical.eda               # tabela 1, rys. 1-3
-python -m task1_classical.run_grid          # siatka -> results/task1/grid.csv
-python -m task1_classical.run_best          # najlepsze konfiguracje
-python -m task1_classical.decision_regions  # rys. obszarów decyzyjnych
-python -m task1_classical.analyze           # pozostałe tabele i rysunki
-\end{verbatim}
-
-Zbiory ADBench i DAMI są pobierane automatycznie do \code{data/raw/};
-plik \code{arrhythmia.mat} z ODDS (używany w zadaniach 2 i 3) trzeba
-pobrać ręcznie, bo serwer ODDS nie pozwala na pobieranie automatyczne.
-
 \appendix
-\section{Wyniki wszystkich eksperymentów}
+\FloatBarrier
+\section{Wyniki wszystkich ustawień}
 \label{app:grid}
 
-Tabele zawierają średnie po podziałach (część testowa) dla każdej
-konfiguracji. F1 dotyczy wbudowanej reguły decyzyjnej metody
-(contamination $c$, granica OCSVM lub promień $\varepsilon$ DBSCAN).
+Tabele podają średnią PR-AUC i F1 (część testowa, F1 dla wbudowanej reguły
+metody: $c$, granicy OCSVM lub promienia $\varepsilon$) dla każdego
+sprawdzonego ustawienia.
 
 {\scriptsize
 \setlength{\tabcolsep}{4pt}

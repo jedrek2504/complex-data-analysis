@@ -3,7 +3,7 @@
 Zadania laboratoryjne z przedmiotu *Analiza danych złożonych z detekcją wyjątków*
 (Politechnika Łódzka, WFTIMS, rok akademicki 2026/2027).
 
-Autor: Jędrzej Kostyk (nr indeksu 264339)
+Autorzy: Jędrzej Kostyk (nr indeksu 264339), Jędrzej Małaczyński (nr indeksu 264351)
 
 | Zadanie | Temat | Raport |
 |---|---|---|
@@ -137,6 +137,7 @@ python -m task1_classical.analyze
 # ok. 7 GB RAM wystarcza na 3 procesy)
 python -m task2_representations.run
 python -m task2_representations.analyze
+python -m task2_representations.detection_maps   # mapy „co wykryto” (ok. 2,5 min)
 
 # Zadanie 3 (wymaga wyników zadania 2)
 python -m task3_ensemble.run_base
@@ -144,6 +145,7 @@ python -m task3_ensemble.run_ensembles
 python -m task3_ensemble.run_base --confirm        # test potwierdzający, nowe ziarna
 python -m task3_ensemble.run_ensembles --confirm
 python -m task3_ensemble.analyze
+python -m task3_ensemble.detection_maps
 
 # Raporty (XeLaTeX)
 cd report/zadanie1 && latexmk -xelatex zadanie1.tex

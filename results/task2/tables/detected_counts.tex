@@ -1,0 +1,10 @@
+\begin{tabular}{lrcccc}
+\toprule
+Zbiór danych & \makecell[r]{Anomalie\\w teście} & dane oryginalne & PCA & UMAP & autoenkoder \\
+\midrule
+Cardio & 44 & \makecell{36 / 8 / 36\\\footnotesize(OCSVM)} & \makecell{29 / 15 / 18\\\footnotesize(OCSVM)} & \makecell{34 / 10 / 10\\\footnotesize(OCSVM)} & \makecell{36 / 8 / 27\\\footnotesize(OCSVM)} \\
+Arrhythmia & 16 & \makecell{6 / 10 / 17\\\footnotesize(IForest)} & \makecell{5 / 11 / 12\\\footnotesize(LOF)} & \makecell{4 / 12 / 17\\\footnotesize(LOF)} & \makecell{5 / 11 / 10\\\footnotesize(LOF)} \\
+WDBC & 2 & \makecell{2 / 0 / 2\\\footnotesize(LOF)} & \makecell{2 / 0 / 1\\\footnotesize(LOF)} & \makecell{1 / 1 / 0\\\footnotesize(OCSVM)} & \makecell{2 / 0 / 2\\\footnotesize(LOF)} \\
+Campaign & 1160 & \makecell{397 / 763 / 870\\\footnotesize(IForest)} & \makecell{327 / 833 / 592\\\footnotesize(IForest)} & \makecell{390 / 770 / 601\\\footnotesize(IForest)} & \makecell{497 / 663 / 905\\\footnotesize(błąd rekonstrukcji)} \\
+\bottomrule
+\end{tabular}

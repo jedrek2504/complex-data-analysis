@@ -1,18 +1,18 @@
 \begin{tabular}{llrrrrrlr}
 \toprule
-Zbiór & Detektor & Zad. 1 & Oryginalna & PCA & UMAP & Autoenkoder & Najlepsza repr. & Zysk \\
+Zbiór danych & Detektor & Zad. 1 & \makecell[r]{dane\\oryginalne} & PCA & UMAP & autoenkoder & Najlepsza & Zysk \\
 \midrule
 Cardio & IForest & 0,600 & 0,595 & 0,635 & 0,601 & 0,593 & PCA & +0,040 \\
  & LOF & 0,310 & 0,310 & 0,576 & 0,238 & 0,385 & PCA & +0,266 \\
  & OCSVM & 0,763 & 0,596 & 0,663 & 0,836 & 0,624 & UMAP & +0,239 \\
-Arrhythmia & IForest & -- & 0,583 & 0,571 & 0,327 & 0,580 & Oryginalna & +0,000 \\
- & LOF & -- & 0,458 & 0,588 & 0,365 & 0,597 & Autoenkoder & +0,138 \\
- & OCSVM & -- & 0,467 & 0,556 & 0,294 & 0,585 & Autoenkoder & +0,118 \\
-WDBC & IForest & -- & 0,754 & 0,753 & 0,658 & 0,670 & Oryginalna & +0,000 \\
+Arrhythmia & IForest & -- & 0,583 & 0,571 & 0,327 & 0,580 & dane oryginalne & +0,000 \\
+ & LOF & -- & 0,458 & 0,588 & 0,365 & 0,597 & autoenkoder & +0,138 \\
+ & OCSVM & -- & 0,467 & 0,556 & 0,294 & 0,585 & autoenkoder & +0,118 \\
+WDBC & IForest & -- & 0,754 & 0,753 & 0,658 & 0,670 & dane oryginalne & +0,000 \\
  & LOF & -- & 0,705 & 0,916 & 0,692 & 0,754 & PCA & +0,212 \\
  & OCSVM & -- & 0,699 & 0,925 & 0,668 & 0,646 & PCA & +0,226 \\
 Campaign & IForest & -- & 0,292 & 0,303 & 0,229 & 0,260 & PCA & +0,010 \\
- & LOF & -- & 0,202 & 0,148 & 0,140 & 0,177 & Oryginalna & +0,000 \\
- & OCSVM & -- & 0,276 & 0,247 & 0,176 & 0,228 & Oryginalna & +0,000 \\
+ & LOF & -- & 0,202 & 0,148 & 0,140 & 0,177 & dane oryginalne & +0,000 \\
+ & OCSVM & -- & 0,276 & 0,247 & 0,176 & 0,228 & dane oryginalne & +0,000 \\
 \bottomrule
 \end{tabular}

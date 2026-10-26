@@ -1,22 +1,22 @@
 \begin{tabular}{lllrrr}
 \toprule
-Zbiór & Reprezentacja & Detektor & R globalne & R lokalne & PR-AUC \\
+Zbiór danych & Reprezentacja & Detektor & \makecell[r]{Recall\\globalne} & \makecell[r]{Recall\\lokalne} & PR-AUC \\
 \midrule
-Cardio & Oryginalna & OCSVM & 0,971 & 0,620 & 0,596 \\
+Cardio & dane oryginalne & OCSVM & 0,971 & 0,620 & 0,596 \\
  & PCA & OCSVM & 0,910 & 0,642 & 0,663 \\
  & UMAP & OCSVM & 0,854 & 0,745 & 0,836 \\
- & Autoenkoder & OCSVM & 0,988 & 0,599 & 0,624 \\
-Arrhythmia & Oryginalna & IForest & 0,838 & 0,203 & 0,583 \\
+ & autoenkoder & OCSVM & 0,988 & 0,599 & 0,624 \\
+Arrhythmia & dane oryginalne & IForest & 0,838 & 0,203 & 0,583 \\
  & PCA & LOF & 0,874 & 0,217 & 0,588 \\
  & UMAP & LOF & 0,657 & 0,238 & 0,365 \\
- & Autoenkoder & LOF & 0,886 & 0,281 & 0,597 \\
-WDBC & Oryginalna & LOF & 0,955 & 0,580 & 0,705 \\
+ & autoenkoder & LOF & 0,886 & 0,281 & 0,597 \\
+WDBC & dane oryginalne & LOF & 0,955 & 0,580 & 0,705 \\
  & PCA & LOF & 1,000 & 0,759 & 0,916 \\
  & UMAP & OCSVM & 0,955 & 0,741 & 0,668 \\
- & Autoenkoder & LOF & 0,955 & 0,592 & 0,754 \\
-Campaign & Oryginalna & IForest & 0,831 & 0,278 & 0,292 \\
+ & autoenkoder & LOF & 0,955 & 0,592 & 0,754 \\
+Campaign & dane oryginalne & IForest & 0,831 & 0,278 & 0,292 \\
  & PCA & IForest & 0,851 & 0,231 & 0,303 \\
  & UMAP & IForest & 0,628 & 0,328 & 0,229 \\
- & Autoenkoder & Rekonstrukcja & 0,995 & 0,522 & 0,294 \\
+ & autoenkoder & błąd rekonstrukcji & 0,995 & 0,522 & 0,294 \\
 \bottomrule
 \end{tabular}

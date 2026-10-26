@@ -2,10 +2,11 @@
 
 Selection rule (validation only): for every dataset, representation family
 and detector, the pair (representation parameters, detector parameters) with
-the highest mean validation PR-AUC over the 10 seeds is chosen. Sweeps over
-one representation parameter (e.g. the number of PCA components) choose the
-detector parameters on validation separately for every value of the swept
-parameter. The number of seeds differs between datasets (common/protocol.py).
+the highest mean validation PR-AUC over the seeds is chosen. Sweeps over one
+representation parameter (e.g. the number of PCA components) choose the
+remaining parameters, including the detector, on validation separately for
+every value of the swept parameter. The number of seeds differs between
+datasets (common/protocol.py).
 """
 
 import json
@@ -15,20 +16,42 @@ import numpy as np
 import pandas as pd
 
 from common import ROOT
-from common.datasets import DISPLAY_NAMES, TASK2_DATASETS
+from common.datasets import DISPLAY_NAMES, SPECS, TASK2_DATASETS, load_dataset
 from common.latex import num, pm, tabular
-from common.plotting import (BLUES, METHOD_COLORS, NORMAL_COLOR, TYPE_COLORS,
-                            TYPE_LABELS, save, setup)
+from common.style import (GLOBAL_COLOR, LOCAL_COLOR, NORMAL, WIDTH, line, save, setup,
+                          styles_for)
 
 OUT = ROOT / "results" / "task2"
 FIG, TAB = OUT / "figures", OUT / "tables"
 REPS = ["Original", "PCA", "UMAP", "AE"]
 DETECTORS = ["IForest", "LOF", "OCSVM", "Reconstruction"]
 DET_LABEL = {"IForest": "IForest", "LOF": "LOF", "OCSVM": "OCSVM",
-             "Reconstruction": "Rekonstrukcja"}
-DET_COLORS = {**METHOD_COLORS, "Reconstruction": METHOD_COLORS["PCA"]}
-REP_LABEL = {"Original": "Oryginalna", "PCA": "PCA", "UMAP": "UMAP", "AE": "Autoenkoder"}
+             "Reconstruction": "błąd rekonstrukcji"}
+REP_LABEL = {"Original": "dane oryginalne", "PCA": "PCA", "UMAP": "UMAP",
+             "AE": "autoenkoder"}
+DET_STYLE = {
+    "IForest": {"color": "#0072B2", "marker": "o", "ls": "-", "hatch": ""},
+    "LOF": {"color": "#D55E00", "marker": "s", "ls": "--", "hatch": "//"},
+    "OCSVM": {"color": "#E69F00", "marker": "D", "ls": ":", "hatch": ".."},
+    "Reconstruction": {"color": "#009E73", "marker": "^", "ls": "-.", "hatch": "\\\\"},
+}
+REP_STYLE = {
+    "Original": {"color": "#000000", "marker": "*", "ls": "-", "hatch": ""},
+    "PCA": {"color": "#0072B2", "marker": "o", "ls": "--", "hatch": "//"},
+    "UMAP": {"color": "#CC79A7", "marker": "s", "ls": "-.", "hatch": "xx"},
+    "AE": {"color": "#009E73", "marker": "^", "ls": ":", "hatch": "\\\\"},
+}
+DATASET_STYLE = styles_for(TASK2_DATASETS)
+NAMES = [DISPLAY_NAMES[d] for d in TASK2_DATASETS]
 MAIN_AE = '"hidden": [64, 32]'
+SOURCE_NAMES = {"adbench": "ADBench", "odds": "ODDS", "dami": "DAMI"}
+CONTENT = {
+    "cardio": "zapisy KTG płodu; anomalia = zapis patologiczny",
+    "arrhythmia": "zapisy EKG; anomalia = rzadki typ arytmii",
+    "wdbc": "pomiary jąder komórkowych guzów; anomalia = guz złośliwy",
+    "campaign": "kontakty banku z klientami; anomalia = klient założył lokatę",
+}
+SHOWN_FEATURES = 5
 
 
 def load():
@@ -58,6 +81,18 @@ def select(df, keys):
     return best
 
 
+def best_per_rep(best):
+    """Per dataset and representation: the detector with the best validation PR-AUC."""
+    idx = best.groupby(["dataset", "rep"]).val_pr_auc.idxmax()
+    return best.loc[idx].reset_index(drop=True)
+
+
+def with_param(df, key):
+    out = df.copy()
+    out[key] = out.rep_params.map(lambda p: json.loads(p)[key])
+    return out
+
+
 def describe(rep, rep_params, det, det_params):
     rp, dp = json.loads(rep_params), json.loads(det_params)
     parts = []
@@ -75,12 +110,49 @@ def describe(rep, rep_params, det, det_params):
     return "; ".join(parts) if parts else "--"
 
 
+def signed(v, digits=3):
+    return ("+" if v >= 0 else "") + num(v, digits)
+
+
 # ------------------------------------------------------------------ tables
 
+def table_datasets():
+    rows = []
+    for d in TASK2_DATASETS:
+        s = SPECS[d]
+        rows.append({
+            "Zbiór danych": DISPLAY_NAMES[d],
+            "Źródło": SOURCE_NAMES[s.source],
+            "Co zawiera": CONTENT[d],
+            "Obserwacje": f"{s.n:,}".replace(",", "\\,"),
+            "Cechy": str(s.d),
+            "Anomalie": f"{s.anomalies:,}".replace(",", "\\,")
+                        + f" ({num(100 * s.anomalies / s.n, 1)}\\,\\%)",
+        })
+    tabular(pd.DataFrame(rows), TAB / "datasets.tex", align="llL{5.2cm}rrr")
+
+
+def table_samples(d):
+    """First normal and first anomalous record, the first few features."""
+    data = load_dataset(d)
+    rows = [np.flatnonzero(data.y == 0)[0], np.flatnonzero(data.y == 1)[0]]
+    names = [f"cecha {i + 1}" for i in range(SHOWN_FEATURES)]
+
+    def digits(j):
+        return 0 if np.all(data.X[:, j] == np.round(data.X[:, j])) else 2
+
+    table = pd.DataFrame({
+        name: [num(data.X[r, j], digits(j)) for r in rows] for j, name in enumerate(names)})
+    table["\\dots"] = "\\dots"
+    table["Anomalia"] = ["nie" if data.y[r] == 0 else "tak" for r in rows]
+    tabular(table, TAB / f"sample_{d}.tex", align="r" * (len(names) + 1) + "c")
+
+
 def table_configs(best):
-    lines = ["\\begin{longtable}{lllp{2.7cm}rrrrrrr}", "\\toprule",
-             "Zbiór & Repr. & Detektor & Konfiguracja & Prec. & Rec. & F1 & ROC & "
-             "PR-AUC & $t_{r}$ [ms] & $t_{d}$ [ms] \\\\", "\\midrule", "\\endhead"]
+    lines = ["\\begin{longtable}{lllL{2.7cm}rrrrrrr}", "\\toprule",
+             "Zbiór & Repr. & Detektor & Ustawienie & Prec. & Rec. & F1 & ROC-AUC & "
+             "PR-AUC & \\makecell[r]{$t_{r}$\\\\{}[ms]} & \\makecell[r]{$t_{d}$\\\\{}[ms]} \\\\",
+             "\\midrule", "\\endhead"]
     for d in TASK2_DATASETS:
         sub = best[best.dataset == d]
         top_pr = sub.test_pr_auc.max()
@@ -94,8 +166,8 @@ def table_configs(best):
                 pr = pm(r.test_pr_auc, r.test_pr_auc_sd)
                 if np.isclose(r.test_pr_auc, top_pr):
                     pr = f"\\textbf{{{pr}}}"
-                short_rep = {"Original": "Oryg.", "AE": "AE"}.get(rep, rep)
-                short_det = {"Reconstruction": "Rekonstr."}.get(det, det)
+                short_rep = {"Original": "oryg.", "AE": "AE"}.get(rep, rep)
+                short_det = {"Reconstruction": "rekonstr."}.get(det, det)
                 cells = [DISPLAY_NAMES[d] if first else "", short_rep, short_det,
                          describe(rep, r.rep_params, det, r.det_params),
                          num(r.test_precision), num(r.test_recall), num(r.test_f1),
@@ -119,20 +191,21 @@ def table_task1_comparison(best):
     rows = []
     for d in TASK2_DATASETS:
         for det in ("IForest", "LOF", "OCSVM"):
-            r = {"Zbiór": DISPLAY_NAMES[d] if det == "IForest" else "", "Detektor": det,
-                 "Zad. 1": t1.get((d, det), np.nan)}
+            r = {"Zbiór danych": DISPLAY_NAMES[d] if det == "IForest" else "",
+                 "Detektor": det, "Zad. 1": t1.get((d, det), np.nan)}
             for rep in REPS:
                 r[REP_LABEL[rep]] = best[(best.dataset == d) & (best.rep == rep)
                                          & (best.detector == det)].test_pr_auc.iloc[0]
             best_rep = max(REPS, key=lambda x: r[REP_LABEL[x]])
-            r["Najlepsza repr."] = REP_LABEL[best_rep]
+            r["Najlepsza"] = REP_LABEL[best_rep]
             r["Zysk"] = r[REP_LABEL[best_rep]] - r[REP_LABEL["Original"]]
             rows.append(r)
     df = pd.DataFrame(rows)
     out = df.copy()
     for c in ["Zad. 1"] + [REP_LABEL[x] for x in REPS]:
         out[c] = [num(v) for v in df[c]]
-    out["Zysk"] = [("+" if v >= 0 else "") + num(v) for v in df["Zysk"]]
+    out["Zysk"] = [signed(v) for v in df["Zysk"]]
+    out = out.rename(columns={"dane oryginalne": "\\makecell[r]{dane\\\\oryginalne}"})
     tabular(out, TAB / "task1_comparison.tex", align="llrrrrrlr")
     return df
 
@@ -151,216 +224,247 @@ def table_ae_architecture(runs, structure):
             per_det = select(sub[sub.detector != "Reconstruction"], ["dataset", "detector"])
             det = per_det.loc[per_det.val_pr_auc.idxmax()]
             s = st[(st.dataset == d) & st.rep_params.str.contains(key, regex=False)]
-            rows.append({"Zbiór": DISPLAY_NAMES[d] if hidden == "[32]" else "",
-                         "Architektura": label,
-                         "PR-AUC rekonstr.": num(rec.test_pr_auc.mean()),
-                         "PR-AUC detektor w $z$": f"{num(det.test_pr_auc)} ({det.detector})",
-                         "Epoki": num(s.ae_epochs.mean(), 0),
-                         "Czas uczenia [s]": num(s.rep_fit_time.mean(), 2)})
+            rows.append({
+                "Zbiór danych": DISPLAY_NAMES[d] if hidden == "[32]" else "",
+                "Architektura": label,
+                "\\makecell[r]{PR-AUC błędu\\\\rekonstrukcji}": num(rec.test_pr_auc.mean()),
+                "\\makecell[r]{PR-AUC detektora\\\\w przestrzeni $z$}":
+                    f"{num(det.test_pr_auc)} ({det.detector})",
+                "\\makecell[r]{Epoki\\\\uczenia}": num(s.ae_epochs.mean(), 0),
+                "\\makecell[r]{Czas\\\\uczenia [s]}": num(s.rep_fit_time.mean(), 2)})
     tabular(pd.DataFrame(rows), TAB / "ae_architecture.tex", align="llrrrr")
 
 
 def table_types(best):
     """Recall of global and local anomalies of the best detector (validation
     PR-AUC) in every representation."""
+    chosen = best_per_rep(best)
     rows = []
     for d in TASK2_DATASETS:
         for i, rep in enumerate(REPS):
-            sub = best[(best.dataset == d) & (best.rep == rep)]
-            r = sub.loc[sub.val_pr_auc.idxmax()]
-            rows.append({"Zbiór": DISPLAY_NAMES[d] if i == 0 else "",
+            r = chosen[(chosen.dataset == d) & (chosen.rep == rep)].iloc[0]
+            rows.append({"Zbiór danych": DISPLAY_NAMES[d] if i == 0 else "",
                          "Reprezentacja": REP_LABEL[rep], "Detektor": DET_LABEL[r.detector],
-                         "R globalne": r.test_recall_global, "R lokalne": r.test_recall_local,
+                         "\\makecell[r]{Recall\\\\globalne}": r.test_recall_global,
+                         "\\makecell[r]{Recall\\\\lokalne}": r.test_recall_local,
                          "PR-AUC": r.test_pr_auc})
     tabular(pd.DataFrame(rows), TAB / "recall_by_type.tex", align="lllrrr")
 
 
-def table_pca_types(runs, dataset):
-    """Recall per anomaly type as a function of the number of PCA components."""
-    pca = runs[(runs.dataset == dataset) & (runs.rep == "PCA")].copy()
-    pca["k"] = pca.rep_params.map(lambda p: json.loads(p)["n_components"])
-    orig = runs[(runs.dataset == dataset) & (runs.rep == "Original")]
-    dim = int(orig.rep_dim.iloc[0])
+def table_pca_types(runs, structure):
+    """LOF and the PCA reconstruction error for several numbers of components:
+    PR-AUC and recall of global / local anomalies, every dataset."""
+    pca = with_param(runs[runs.rep == "PCA"], "n_components")
+    st = with_param(structure[structure.rep == "PCA"], "n_components")
     rows = []
+    for d in TASK2_DATASETS:
+        ev = st[st.dataset == d].groupby("n_components").explained_variance.mean()
+        orig = select(runs[(runs.dataset == d) & (runs.rep == "Original")
+                           & (runs.detector == "LOF")], ["dataset"]).iloc[0]
+        lof = select(pca[(pca.dataset == d) & (pca.detector == "LOF")], ["n_components"])
+        rec = select(pca[(pca.dataset == d) & (pca.detector == "Reconstruction")],
+                     ["n_components"])
+        lof, rec = lof.set_index("n_components"), rec.set_index("n_components")
+        rows.append([DISPLAY_NAMES[d], "wszystkie", "1,00", num(orig.test_pr_auc),
+                     num(orig.test_recall_global), num(orig.test_recall_local),
+                     "--", "--"])
+        for k in (1, 2, 5, 20):
+            rows.append(["", str(k), num(ev[k], 2), num(lof.test_pr_auc[k]),
+                         num(lof.test_recall_global[k]), num(lof.test_recall_local[k]),
+                         num(rec.test_pr_auc[k]), num(rec.test_recall_global[k])])
+    lines = ["\\begin{tabular}{lrrrrrrr}", "\\toprule",
+             " & & & \\multicolumn{3}{c}{LOF} & \\multicolumn{2}{c}{błąd rekonstrukcji} \\\\",
+             "\\cmidrule(lr){4-6}\\cmidrule(lr){7-8}",
+             "Zbiór danych & $k$ & \\makecell[r]{zachowana\\\\wariancja} & PR-AUC & "
+             "\\makecell[r]{Recall\\\\globalne} & \\makecell[r]{Recall\\\\lokalne} & PR-AUC & "
+             "\\makecell[r]{Recall\\\\globalne} \\\\", "\\midrule"]
+    for i, r in enumerate(rows):
+        if i and r[0]:
+            lines.append("\\midrule")
+        lines.append(" & ".join(r) + " \\\\")
+    lines += ["\\bottomrule", "\\end{tabular}"]
+    (TAB / "pca_types.tex").write_text("\n".join(lines) + "\n")
 
-    def row(det, k, r, first):
-        return {"Detektor": DET_LABEL[det] if first else "", "$k$": k, "zach. wariancja": "",
-                "PR-AUC": num(r.test_pr_auc), "R globalne": num(r.test_recall_global),
-                "R lokalne": num(r.test_recall_local)}
 
-    for det in ("LOF", "IForest", "Reconstruction"):
-        first = True
-        if det != "Reconstruction":
-            ref = select(orig[orig.detector == det], ["dataset"]).iloc[0]
-            rows.append(dict(row(det, f"oryg. ({dim})", ref, first),
-                             **{"zach. wariancja": "1,00"}))
-            first = False
-        best = select(pca[pca.detector == det], ["k"]).sort_values("k")
-        for _, r in best[best.k.isin([2, 3, 5, 10, 20])].iterrows():
-            rows.append(row(det, str(int(r.k)), r, first))
-            first = False
-    st = pd.read_csv(OUT / "structure.csv")
-    st = st[(st.dataset == dataset) & (st.rep == "PCA")]
-    ev = st.assign(k=st.rep_params.map(lambda p: json.loads(p)["n_components"])).groupby(
-        "k").explained_variance.mean()
-    for r in rows:
-        if r["$k$"].isdigit():
-            r["zach. wariancja"] = num(ev[int(r["$k$"])], 2)
-    tabular(pd.DataFrame(rows), TAB / f"pca_types_{dataset}.tex", align="llrrrr")
+def param_spreads(runs):
+    """Per dataset: how much the test PR-AUC of the validation-chosen setting
+    changes when one representation parameter is varied (max - min over its
+    values; everything else, including the detector, chosen on validation)."""
+    sweeps = [("PCA", "n_components"), ("UMAP", "n_neighbors"), ("UMAP", "n_components"),
+              ("UMAP", "min_dist"), ("AE", "latent_dim")]
+    rows = []
+    for d in TASK2_DATASETS:
+        r = {"dataset": d}
+        for rep, key in sweeps:
+            sub = with_param(runs[(runs.dataset == d) & (runs.rep == rep)], key)
+            best = select(sub, [key])
+            r[f"{rep}:{key}"] = (best.test_pr_auc.max() - best.test_pr_auc.min()
+                                 if len(best) > 1 else np.nan)
+        rows.append(r)
+    return pd.DataFrame(rows)
+
+
+def table_param_spread(spread):
+    out = pd.DataFrame({
+        "Zbiór danych": [DISPLAY_NAMES[d] for d in spread.dataset],
+        "\\makecell[r]{PCA:\\\\liczba składowych $k$}": [num(v) for v in spread["PCA:n_components"]],
+        "\\makecell[r]{UMAP:\\\\liczba sąsiadów nn}": [num(v) for v in spread["UMAP:n_neighbors"]],
+        "\\makecell[r]{UMAP:\\\\wymiar $m$}": [num(v) for v in spread["UMAP:n_components"]],
+        "\\makecell[r]{UMAP:\\\\odstęp md}": [num(v) for v in spread["UMAP:min_dist"]],
+        "\\makecell[r]{Autoenkoder:\\\\wymiar $z$}": [num(v) for v in spread["AE:latent_dim"]],
+    })
+    tabular(out, TAB / "param_spread.tex", align="lrrrrr")
+
+
+def table_structure(structure):
+    """Trustworthiness of UMAP and class separation (silhouette) per representation."""
+    rows = []
+    for d in TASK2_DATASETS:
+        st = structure[(structure.dataset == d) & structure.main]
+        g = st.groupby(["rep", "rep_params"])[["trustworthiness", "silhouette"]].mean()
+
+        def span(rep, col):
+            v = g.loc[rep][col]
+            return num(v.iloc[0], 2) if len(v) == 1 else f"{num(v.min(), 2)} -- {num(v.max(), 2)}"
+
+        rows.append({"Zbiór danych": DISPLAY_NAMES[d],
+                     "\\makecell[r]{Zaufanie\\\\sąsiedztw UMAP}": span("UMAP", "trustworthiness"),
+                     "\\makecell[r]{Separacja:\\\\dane oryginalne}": span("Original", "silhouette"),
+                     "\\makecell[r]{Separacja:\\\\PCA}": span("PCA", "silhouette"),
+                     "\\makecell[r]{Separacja:\\\\UMAP}": span("UMAP", "silhouette"),
+                     "\\makecell[r]{Separacja:\\\\autoenkoder}": span("AE", "silhouette")})
+    tabular(pd.DataFrame(rows), TAB / "structure.tex", align="lrrrrr")
+
+
+def time_summary(best):
+    """Per dataset and representation: the validation-chosen detector, its test
+    PR-AUC and the times of the representation and of the detector [ms]."""
+    chosen = best_per_rep(best).copy()
+    chosen["t_rep"] = 1000 * (chosen.rep_fit_time + chosen.rep_transform_time)
+    chosen["t_det"] = 1000 * (chosen.det_fit_time + chosen.det_score_time)
+    chosen["t"] = chosen.t_rep + chosen.t_det
+    chosen["rank"] = chosen.groupby("dataset").test_pr_auc.rank(ascending=False)
+    return chosen
+
+
+def table_time(tq):
+    rows = []
+    for rep in REPS:
+        s = tq[tq.rep == rep]
+        rows.append({
+            "Reprezentacja": REP_LABEL[rep],
+            "\\makecell[r]{PR-AUC\\\\(średnio)}": num(s.test_pr_auc.mean()),
+            "\\makecell[r]{Miejsce\\\\(średnio)}": num(s["rank"].mean(), 1),
+            "\\makecell[r]{Czas reprezentacji:\\\\średnio [ms]}":
+                "--" if rep == "Original" else num(s.t_rep.mean(), 0),
+            "\\makecell[r]{Czas reprezentacji:\\\\od -- do [ms]}":
+                "--" if rep == "Original" else f"{num(s.t_rep.min(), 0)} -- {num(s.t_rep.max(), 0)}",
+            "\\makecell[r]{Czas detektora:\\\\średnio [ms]}": num(s.t_det.mean(), 0),
+        })
+    tabular(pd.DataFrame(rows), TAB / "time_quality.tex", align="lrrrrr")
 
 
 # ------------------------------------------------------------------ figures
 
+def grid_axes(height=4.8, sharey=True):
+    fig, axes = plt.subplots(2, 2, figsize=(WIDTH, height), sharey=sharey)
+    return fig, axes.ravel()
+
+
+def legend_above(fig, ax, ncol=4, y=1.0):
+    handles, labels = ax.get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=ncol, bbox_to_anchor=(0.5, y))
+
+
 def fig_matrix(best):
-    fig, axes = plt.subplots(1, 4, figsize=(13, 3.0))
-    for ax, d in zip(axes, TASK2_DATASETS):
+    fig, axes = plt.subplots(2, 2, figsize=(WIDTH, 6.0), constrained_layout=True)
+    for ax, d in zip(axes.ravel(), TASK2_DATASETS):
         M = np.full((4, 4), np.nan)
         for i, rep in enumerate(REPS):
             for j, det in enumerate(DETECTORS):
                 r = best[(best.dataset == d) & (best.rep == rep) & (best.detector == det)]
                 if not r.empty:
                     M[i, j] = r.test_pr_auc.iloc[0]
-        ax.imshow(np.ma.masked_invalid(M), cmap=BLUES, vmin=0, vmax=1)
+        im = ax.imshow(np.ma.masked_invalid(M), cmap="Greys", vmin=0, vmax=1)
         for (i, j), v in np.ndenumerate(M):
-            if not np.isnan(v):
-                ax.text(j, i, num(v, 2), ha="center", va="center", fontsize=8,
-                        color="white" if v > 0.6 else "#0b0b0b")
-            else:
-                ax.text(j, i, "n/d", ha="center", va="center", fontsize=7, color="#52514e")
-        ax.set_xticks(range(4), [DET_LABEL[x] for x in DETECTORS], rotation=30, fontsize=7.5)
-        ax.set_yticks(range(4), [REP_LABEL[x] for x in REPS] if d == TASK2_DATASETS[0]
-                      else [""] * 4)
+            text = "--" if np.isnan(v) else num(v, 2)
+            ax.text(j, i, text, ha="center", va="center", fontsize=11,
+                    color="white" if v > 0.55 else "black")
+        ax.set_xticks(range(4), ["IForest", "LOF", "OCSVM", "rekonstr."], rotation=30,
+                      ha="right")
+        ax.set_yticks(range(4), ["oryginalne", "PCA", "UMAP", "autoenkoder"])
         ax.set_title(DISPLAY_NAMES[d])
         ax.grid(False)
+    cbar = fig.colorbar(im, ax=axes, shrink=0.6)
+    cbar.set_label("PR-AUC (test)")
     save(fig, FIG / "pr_auc_matrix")
 
 
 def fig_pca(runs, structure):
-    pca = runs[runs.rep == "PCA"].copy()
-    pca["k"] = pca.rep_params.map(lambda p: json.loads(p)["n_components"])
-    orig = runs[runs.rep == "Original"]
-    fig, axes = plt.subplots(2, 4, figsize=(13, 4.8), sharex="col")
-    for j, d in enumerate(TASK2_DATASETS):
-        ax = axes[0, j]
+    pca = with_param(runs[runs.rep == "PCA"], "n_components")
+    st = with_param(structure[structure.rep == "PCA"], "n_components")
+    fig, axes = grid_axes()
+    for ax, d in zip(axes, TASK2_DATASETS):
         for det in DETECTORS:
-            sub = pca[(pca.dataset == d) & (pca.detector == det)]
-            best = select(sub, ["k"]).sort_values("k")
-            ax.plot(best.k, best.test_pr_auc, marker="o", color=DET_COLORS[det],
-                    label=DET_LABEL[det])
-            if det != "Reconstruction":
-                ref = select(orig[(orig.dataset == d) & (orig.detector == det)], ["dataset"])
-                ax.axhline(ref.test_pr_auc.iloc[0], color=DET_COLORS[det], lw=0.8, ls=":")
+            best = select(pca[(pca.dataset == d) & (pca.detector == det)],
+                          ["n_components"]).sort_values("n_components")
+            line(ax, best.n_components, best.test_pr_auc, DET_STYLE[det], DET_LABEL[det])
+        ev = st[st.dataset == d].groupby("n_components").explained_variance.mean()
+        ax.plot(ev.index, ev.values, color="#777777", lw=1.6, ls=(0, (2, 2)),
+                label="zachowana wariancja")
         ax.set_title(DISPLAY_NAMES[d])
-        ax.set_ylim(0, 1)
-        st = structure[(structure.dataset == d) & (structure.rep == "PCA")].copy()
-        st["k"] = st.rep_params.map(lambda p: json.loads(p)["n_components"])
-        ev = st.groupby("k").explained_variance.mean()
-        axes[1, j].plot(ev.index, ev.values, marker="o", color="#256abf")
-        axes[1, j].axhline(0.9, color="#52514e", lw=0.8, ls="--")
-        axes[1, j].set_ylim(0, 1.02)
-        axes[1, j].set_xlabel("liczba składowych $k$")
-    axes[0, 0].set_ylabel("PR-AUC (test)")
-    axes[1, 0].set_ylabel("zachowana wariancja")
-    axes[0, 0].legend(fontsize=7)
+        ax.set_ylim(0, 1.02)
+        ax.set_xticks([1, 5, 10, 15, 20])
+    for ax in axes[2:]:
+        ax.set_xlabel("liczba składowych $k$")
+    for ax in axes[::2]:
+        ax.set_ylabel("PR-AUC (test)")
+    legend_above(fig, axes[0], ncol=3)
+    fig.subplots_adjust(hspace=0.35)
     save(fig, FIG / "pca_components")
 
 
 def fig_umap(runs):
-    um = runs[runs.rep == "UMAP"].copy()
-    for key in ("n_components", "n_neighbors", "min_dist"):
-        um[key] = um.rep_params.map(lambda p, k=key: json.loads(p)[k])
-    cols = [(n, md) for n in (5, 15, 50) for md in (0.0, 0.5)]
-    fig, axes = plt.subplots(3, 4, figsize=(13, 5.6))
-    for i, det in enumerate(["IForest", "LOF", "OCSVM"]):
-        for j, d in enumerate(TASK2_DATASETS):
-            sub = um[(um.dataset == d) & (um.detector == det)]
-            best = select(sub, ["n_components", "n_neighbors", "min_dist"])
-            M = np.full((3, len(cols)), np.nan)
-            for a, c in enumerate((2, 5, 10)):
-                for b, (n, md) in enumerate(cols):
-                    hit = best[(best.n_components == c) & (best.n_neighbors == n)
-                               & (best.min_dist == md)]
-                    if not hit.empty:
-                        M[a, b] = hit.test_pr_auc.iloc[0]
-            ax = axes[i, j]
-            ax.imshow(np.ma.masked_invalid(M), cmap=BLUES, vmin=0, vmax=1, aspect="auto")
-            for (a, b), v in np.ndenumerate(M):
-                if np.isnan(v):
-                    ax.text(b, a, "--", ha="center", va="center", fontsize=7, color="#52514e")
-                    continue
-                ax.text(b, a, num(v, 2), ha="center", va="center", fontsize=7,
-                        color="white" if v > 0.6 else "#0b0b0b")
-            ax.set_xticks(range(6), [f"{n}/{num(md, 1)}" for n, md in cols], fontsize=6.5)
-            ax.set_yticks(range(3), [2, 5, 10])
-            ax.grid(False)
-            if i == 0:
-                ax.set_title(DISPLAY_NAMES[d])
-            if j == 0:
-                ax.set_ylabel(f"{det}\nwymiar $m$")
-            if i == 2:
-                ax.set_xlabel("n_neighbors / min_dist")
+    um = with_param(runs[runs.rep == "UMAP"], "n_neighbors")
+    fig, axes = grid_axes()
+    for ax, d in zip(axes, TASK2_DATASETS):
+        for det in ("IForest", "LOF", "OCSVM"):
+            best = select(um[(um.dataset == d) & (um.detector == det)],
+                          ["n_neighbors"]).sort_values("n_neighbors")
+            line(ax, best.n_neighbors, best.test_pr_auc, DET_STYLE[det], DET_LABEL[det])
+        ax.set_xscale("log")
+        ax.set_xticks([5, 15, 50], ["5", "15", "50"])
+        ax.set_xlim(4, 60)
+        ax.set_title(DISPLAY_NAMES[d])
+        ax.set_ylim(0, 1.02)
+    for ax in axes[2:]:
+        ax.set_xlabel("liczba sąsiadów nn")
+    for ax in axes[::2]:
+        ax.set_ylabel("PR-AUC (test)")
+    legend_above(fig, axes[0], ncol=3)
+    fig.subplots_adjust(hspace=0.35)
     save(fig, FIG / "umap_params")
 
 
-def fig_umap_structure(structure):
-    st = structure[structure.rep == "UMAP"].copy()
-    for key in ("n_components", "n_neighbors", "min_dist"):
-        st[key] = st.rep_params.map(lambda p, k=key: json.loads(p)[k])
-    fig, axes = plt.subplots(2, 4, figsize=(13, 4.6), sharex=True)
-    shades = {2: BLUES(0.4), 5: BLUES(0.65), 10: BLUES(0.95)}
-    for j, d in enumerate(TASK2_DATASETS):
-        sub = st[st.dataset == d]
-        for c in (2, 5, 10):
-            for md, ls in ((0.0, "-"), (0.5, "--")):
-                g = sub[(sub.n_components == c) & (sub.min_dist == md)].groupby("n_neighbors")
-                label = f"$m$={c}, md={num(md, 1)}"
-                axes[0, j].plot(g.trustworthiness.mean(), ls=ls, marker="o",
-                                color=shades[c], label=label)
-                axes[1, j].plot(g.silhouette.mean(), ls=ls, marker="o", color=shades[c])
-        orig = structure[(structure.dataset == d) & (structure.rep == "Original")].silhouette.mean()
-        axes[1, j].axhline(orig, color="#52514e", lw=0.8, ls=":")
-        axes[0, j].set_title(DISPLAY_NAMES[d])
-        axes[1, j].set_xscale("log")
-        axes[1, j].set_xticks([5, 15, 50], ["5", "15", "50"])
-        axes[1, j].set_xlabel("n_neighbors")
-    axes[0, 0].set_ylabel("trustworthiness ($k$=10)")
-    axes[1, 0].set_ylabel("silhouette (normalne/anomalie)")
-    axes[0, 0].legend(fontsize=6.5, ncol=1)
-    save(fig, FIG / "umap_structure")
-
-
 def fig_ae(runs):
-    ae = runs[(runs.rep == "AE") & runs.main].copy()
-    ae["z"] = ae.rep_params.map(lambda p: json.loads(p)["latent_dim"])
-    fig, axes = plt.subplots(1, 4, figsize=(13, 2.7), sharey=True)
+    ae = with_param(runs[(runs.rep == "AE") & runs.main], "latent_dim")
+    fig, axes = grid_axes()
     for ax, d in zip(axes, TASK2_DATASETS):
         for det in DETECTORS:
-            best = select(ae[(ae.dataset == d) & (ae.detector == det)], ["z"]).sort_values("z")
-            ax.plot(best.z, best.test_pr_auc, marker="o", color=DET_COLORS[det],
-                    label=DET_LABEL[det])
+            best = select(ae[(ae.dataset == d) & (ae.detector == det)],
+                          ["latent_dim"]).sort_values("latent_dim")
+            line(ax, best.latent_dim, best.test_pr_auc, DET_STYLE[det], DET_LABEL[det])
         ax.set_xscale("log", base=2)
         ax.set_xticks([2, 4, 8, 16], ["2", "4", "8", "16"])
-        ax.set_xlabel("wymiar przestrzeni latentnej")
         ax.set_title(DISPLAY_NAMES[d])
-        ax.set_ylim(0, 1)
-    axes[0].set_ylabel("PR-AUC (test)")
-    axes[0].legend(fontsize=7)
+        ax.set_ylim(0, 1.02)
+    for ax in axes[2:]:
+        ax.set_xlabel("wymiar przestrzeni ukrytej $z$")
+    for ax in axes[::2]:
+        ax.set_ylabel("PR-AUC (test)")
+    legend_above(fig, axes[0], ncol=4)
+    fig.subplots_adjust(hspace=0.35)
     save(fig, FIG / "ae_latent")
-
-    hist = pd.read_csv(OUT / "ae_history.csv")
-    hist = hist[hist.rep_params.str.contains('"latent_dim": 8', regex=False)
-                & hist.rep_params.str.contains(MAIN_AE, regex=False)]
-    fig, axes = plt.subplots(1, 4, figsize=(13, 2.5))
-    for ax, d in zip(axes, TASK2_DATASETS):
-        h = hist[hist.dataset == d]
-        ax.plot(h.epoch, h.train_loss, color="#2a78d6", lw=1.5, label="uczenie")
-        ax.plot(h.epoch, h.holdout_loss, color="#eb6834", lw=1.5, label="odłożone 15\\%")
-        ax.set_yscale("log")
-        ax.set_xlabel("epoka")
-        ax.set_title(DISPLAY_NAMES[d])
-    axes[0].set_ylabel("MSE")
-    axes[0].legend(fontsize=7)
-    save(fig, FIG / "ae_training")
 
 
 def fig_embeddings():
@@ -368,27 +472,30 @@ def fig_embeddings():
     emb = emb[emb.part == "test"]
     panels = [("PCA", '{"n_components": 2}', "PCA ($k$=2)"),
               ("UMAP", '{"min_dist": 0.0, "n_components": 2, "n_neighbors": 15}',
-               "UMAP ($m$=2, nn=15, md=0)"),
-              ("AE", '{"hidden": [64, 32], "latent_dim": 2}', "Autoenkoder ($z$=2)")]
-    fig, axes = plt.subplots(4, 3, figsize=(9.5, 11.5))
+               "UMAP ($m$=2, nn=15)"),
+              ("AE", '{"hidden": [64, 32], "latent_dim": 2}', "autoenkoder ($z$=2)")]
+    fig, axes = plt.subplots(4, 3, figsize=(WIDTH, 8.6))
     for i, d in enumerate(TASK2_DATASETS):
         for j, (rep, params, title) in enumerate(panels):
             ax = axes[i, j]
             e = emb[(emb.dataset == d) & (emb.rep == rep) & (emb.rep_params == params)]
+            big = len(e) > 2000
             n = e[e.y == 0]
-            ax.scatter(n.z1, n.z2, s=4 if len(n) > 2000 else 7, c=NORMAL_COLOR, lw=0,
-                       label="normalne")
-            for t, color in TYPE_COLORS.items():
-                a = e[e.type == t]
-                ax.scatter(a.z1, a.z2, s=8 if len(a) > 300 else 16, c=color, ec="white",
-                           lw=0.3, label=f"anomalie {TYPE_LABELS[t]}")
+            ax.scatter(n.z1, n.z2, s=4 if big else 9, c=NORMAL, lw=0, label="normalne")
+            g, loc = e[e.type == "global"], e[e.type == "local"]
+            ax.scatter(g.z1, g.z2, s=10 if big else 26, c=GLOBAL_COLOR, marker="D",
+                       ec="black", lw=0.3, label="anomalie globalne")
+            ax.scatter(loc.z1, loc.z2, s=10 if big else 24, c=LOCAL_COLOR, marker="o",
+                       ec="black", lw=0.3, label="anomalie lokalne")
             ax.set_xticks([]), ax.set_yticks([])
             if i == 0:
                 ax.set_title(title)
             if j == 0:
-                ax.set_ylabel(DISPLAY_NAMES[d])
+                ax.set_ylabel(DISPLAY_NAMES[d], fontsize=12)
     handles, labels = axes[0, 0].get_legend_handles_labels()
-    fig.legend(handles, labels, ncol=3, loc="lower center", bbox_to_anchor=(0.5, -0.02))
+    fig.legend(handles, labels, ncol=3, loc="lower center", bbox_to_anchor=(0.5, -0.03),
+               markerscale=1.6)
+    fig.subplots_adjust(hspace=0.08, wspace=0.08)
     save(fig, FIG / "embeddings_2d")
 
 
@@ -398,43 +505,57 @@ def fig_separation(runs, structure):
     best = select(main, ["dataset", "rep", "rep_params"])
     st = structure.groupby(["dataset", "rep", "rep_params"]).silhouette.mean().reset_index()
     df = best.merge(st, on=["dataset", "rep", "rep_params"])
-    markers = {"Original": "*", "PCA": "o", "UMAP": "s", "AE": "^"}
-    fig, axes = plt.subplots(1, 4, figsize=(13, 2.9), sharey=True)
+    fig, axes = grid_axes(sharey=False)
     for ax, d in zip(axes, TASK2_DATASETS):
         sub = df[df.dataset == d]
         for rep in REPS:
-            s = sub[sub.rep == rep]
-            ax.scatter(s.silhouette, s.test_pr_auc, marker=markers[rep], s=40 if rep == "Original" else 18,
-                       color=BLUES(0.9) if rep == "Original" else BLUES(0.35 + 0.2 * REPS.index(rep)),
-                       label=REP_LABEL[rep], edgecolor="white", lw=0.4)
+            s, st_ = sub[sub.rep == rep], REP_STYLE[rep]
+            ax.scatter(s.silhouette, s.test_pr_auc, marker=st_["marker"],
+                       s=110 if rep == "Original" else 40, color=st_["color"],
+                       edgecolor="white", lw=0.4, label=REP_LABEL[rep])
         r = np.corrcoef(sub.silhouette, sub.test_pr_auc)[0, 1]
         ax.set_title(f"{DISPLAY_NAMES[d]} ($r$ = {num(r, 2)})")
-        ax.set_xlabel("silhouette (normalne/anomalie)")
-    axes[0].set_ylabel("PR-AUC najlepszego detektora")
-    axes[0].legend(fontsize=7)
+    for ax in axes[2:]:
+        ax.set_xlabel("separacja klas (silhouette)")
+    for ax in axes[::2]:
+        ax.set_ylabel("PR-AUC (test)")
+    legend_above(fig, axes[0], ncol=4)
+    fig.subplots_adjust(hspace=0.35, wspace=0.25)
     save(fig, FIG / "separation_vs_detection")
     df.to_csv(OUT / "separation_vs_detection.csv", index=False)
 
 
-def fig_time(best):
-    markers = {"Original": "*", "PCA": "o", "UMAP": "s", "AE": "^"}
-    fig, axes = plt.subplots(1, 4, figsize=(13, 2.9), sharey=True)
-    for ax, d in zip(axes, TASK2_DATASETS):
-        sub = best[best.dataset == d]
-        for _, r in sub.iterrows():
-            ax.scatter(1000 * r.total_time, r.test_pr_auc, marker=markers[r.rep],
-                       s=45 if r.rep == "Original" else 26, color=DET_COLORS[r.detector],
-                       edgecolor="white", lw=0.4)
-        ax.set_xscale("log")
-        ax.set_xlabel("czas repr. + detekcji [ms]")
-        ax.set_title(DISPLAY_NAMES[d])
-    handles = [plt.Line2D([], [], ls="", marker=m, color="#52514e", label=REP_LABEL[k])
-               for k, m in markers.items()]
-    handles += [plt.Line2D([], [], ls="", marker="o", color=DET_COLORS[k], label=DET_LABEL[k])
-                for k in DETECTORS]
-    fig.legend(handles=handles, ncol=8, loc="upper center", bbox_to_anchor=(0.5, 1.08),
-               fontsize=7.5)
-    axes[0].set_ylabel("PR-AUC (test)")
+def fig_time(tq):
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(WIDTH, 3.4))
+    n_train = {d: SPECS[d].n // 2 for d in TASK2_DATASETS}
+    order = sorted(TASK2_DATASETS, key=n_train.get)
+    for rep in REPS:
+        s = tq[tq.rep == rep].set_index("dataset")
+        st = REP_STYLE[rep]
+        a1.plot([s.t.min(), s.t.max()], [s.test_pr_auc.mean()] * 2, color=st["color"],
+                lw=1.2, alpha=0.6)
+        a1.scatter(s.t.mean(), s.test_pr_auc.mean(), s=110 if rep == "Original" else 70,
+                   color=st["color"], marker=st["marker"], edgecolor="black", lw=0.5,
+                   zorder=3)
+        below = rep == "Original"
+        a1.annotate(REP_LABEL[rep], (s.t.mean(), s.test_pr_auc.mean()),
+                    xytext=(0, -16 if below else 8), textcoords="offset points",
+                    ha="center", fontsize=10)
+        if rep != "Original":  # no representation to compute
+            line(a2, [n_train[d] for d in order], s.t_rep.loc[order].values, st,
+                 REP_LABEL[rep])
+    a1.set_xscale("log")
+    a1.set_xlabel("czas reprezentacji i detekcji [ms]\n(punkt: średnio, kreska: od--do)")
+    a1.set_ylabel("PR-AUC (test), średnio")
+    a1.set_ylim(0.3, 0.75)
+    a1.set_title("(a) jakość a czas, 4 zbiory danych")
+    a2.set_xscale("log")
+    a2.set_yscale("log")
+    a2.set_xlabel("liczba punktów uczących")
+    a2.set_ylabel("czas reprezentacji [ms]")
+    a2.set_title("(b) czas a wielkość zbioru danych")
+    a2.legend(fontsize=9.5, loc="upper left")
+    fig.subplots_adjust(wspace=0.35)
     save(fig, FIG / "time_vs_quality")
 
 
@@ -445,24 +566,34 @@ def main():
     best = select(runs[runs.main], ["dataset", "rep", "detector"])
     best.to_csv(OUT / "selected_configs.csv", index=False)
 
+    table_datasets()
+    for d in TASK2_DATASETS:
+        table_samples(d)
     table_configs(best)
     comparison = table_task1_comparison(best)
     comparison.to_csv(OUT / "task1_comparison.csv", index=False)
     table_ae_architecture(runs, structure)
     table_types(best)
-    for d in TASK2_DATASETS:
-        table_pca_types(runs[runs.main], d)
+    table_pca_types(runs[runs.main], structure)
+    spread = param_spreads(runs[runs.main])
+    spread.to_csv(OUT / "param_spread.csv", index=False)
+    table_param_spread(spread)
+    table_structure(structure)
+    tq = time_summary(best)
+    tq.to_csv(OUT / "time_quality.csv", index=False)
+    table_time(tq)
 
     fig_matrix(best)
     fig_pca(runs[runs.main], structure)
     fig_umap(runs)
-    fig_umap_structure(structure)
     fig_ae(runs)
     fig_embeddings()
     fig_separation(runs, structure)
-    fig_time(best)
+    fig_time(tq)
     print(best.pivot_table(index=["dataset", "rep"], columns="detector",
                            values="test_pr_auc").round(3))
+    print(spread.round(3))
+    print(tq[["dataset", "rep", "detector", "test_pr_auc", "t_rep", "t_det"]].round(3))
 
 
 if __name__ == "__main__":

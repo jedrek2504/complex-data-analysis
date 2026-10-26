@@ -1,5 +1,11 @@
-\newcommand{\detIForest}{TP = 25, FN = 19, FP = 27}
-\newcommand{\detLOF}{TP = 41, FN = 3, FP = 119}
-\newcommand{\detCOF}{TP = 14, FN = 30, FP = 107}
-\newcommand{\detOCSVM}{TP = 30, FN = 14, FP = 13}
-\newcommand{\detDBSCAN}{TP = 20, FN = 24, FP = 18}
+\begin{tabular}{lrccccc}
+\toprule
+Zbiór danych & \makecell[r]{Anomalie\\w teście} & IForest & LOF & COF & OCSVM & DBSCAN \\
+\midrule
+Breastw & 60 & 56 / 4 / 10 & 54 / 6 / 74 & 56 / 4 / 73 & 55 / 5 / 12 & 57 / 3 / 8 \\
+Mammography & 65 & 22 / 43 / 27 & 18 / 47 / 23 & 15 / 50 / 18 & 23 / 42 / 35 & 15 / 50 / 28 \\
+Wine & 3 & 1 / 2 / 2 & 1 / 2 / 3 & 2 / 1 / 21 & 3 / 0 / 0 & 1 / 2 / 2 \\
+Statlog Heart & 2 & 0 / 2 / 4 & 2 / 0 / 5 & 2 / 0 / 12 & 2 / 0 / 4 & 2 / 0 / 5 \\
+Cardio & 44 & 25 / 19 / 27 & 41 / 3 / 119 & 14 / 30 / 107 & 30 / 14 / 13 & 20 / 24 / 18 \\
+\bottomrule
+\end{tabular}

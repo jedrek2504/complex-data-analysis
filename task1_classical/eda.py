@@ -5,7 +5,7 @@ Outputs (results/task1/):
   tables/datasets.tex        - one row per dataset (source, content, size)
   tables/sample_<name>.tex   - two example records of every dataset
   tables/eda_summary.tex     - shape indicators used later in the report
-  figures/eda_pca.pdf        - 2-D PCA view of two contrasting datasets
+  figures/eda_pca.pdf        - 2-D PCA view of every dataset
   figures/eda_feature_shift.pdf - how strongly single features separate anomalies
 """
 
@@ -41,7 +41,6 @@ FEATURE_NAMES = {
               "cholesterol"],
 }
 SHOWN_FEATURES = 5
-PCA_DATASETS = ("breastw", "heart")
 
 
 def summarise(data):
@@ -115,21 +114,25 @@ def table_summary(summary):
 
 
 def fig_pca(datasets):
-    fig, axes = plt.subplots(1, 2, figsize=(WIDTH, 3.1))
-    for ax, d in zip(axes, [x for x in datasets if x.name in PCA_DATASETS]):
+    fig, axes = plt.subplots(2, 3, figsize=(WIDTH, 5.2))
+    axes = axes.ravel()
+    for ax, d in zip(axes, datasets):
         Z = PCA(2).fit_transform(StandardScaler().fit_transform(d.X))
         kinds = anomaly_kind(d.name)
-        ax.scatter(*Z[d.y == 0].T, s=12, c=NORMAL, lw=0, label="normalne")
-        ax.scatter(*Z[kinds == "global"].T, s=34, c="#0072B2", marker="D",
-                   ec="black", lw=0.5, label="anomalie globalne")
-        ax.scatter(*Z[kinds == "local"].T, s=30, c="#D55E00", marker="o",
-                   ec="black", lw=0.5, label="anomalie lokalne")
+        ax.scatter(*Z[d.y == 0].T, s=8, c=NORMAL, lw=0, label="normalne")
+        ax.scatter(*Z[kinds == "global"].T, s=26, c="#0072B2", marker="D",
+                   ec="black", lw=0.4, label="anomalie globalne")
+        ax.scatter(*Z[kinds == "local"].T, s=24, c="#D55E00", marker="o",
+                   ec="black", lw=0.4, label="anomalie lokalne")
         ax.set_title(DISPLAY_NAMES[d.name])
-        ax.set_xlabel("1. składowa PCA")
         ax.set_xticks([]), ax.set_yticks([])
-    axes[0].set_ylabel("2. składowa PCA")
+    for ax in axes[3:5]:
+        ax.set_xlabel("1. składowa PCA")
+    for ax in axes[::3]:
+        ax.set_ylabel("2. składowa PCA")
+    axes[5].axis("off")
     handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.09))
+    axes[5].legend(handles, labels, loc="center", markerscale=1.4, fontsize=10.5)
     save(fig, OUT / "figures" / "eda_pca")
 
 

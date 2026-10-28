@@ -1,22 +1,22 @@
-\begin{tabular}{lllrrr}
+\begin{tabular}{lllrrrr}
 \toprule
-Zbiór danych & Reprezentacja & Detektor & \makecell[r]{Recall\\globalne} & \makecell[r]{Recall\\lokalne} & PR-AUC \\
+Zbiór danych & Reprezentacja & Detektor & \makecell[r]{Recall\\globalne} & \makecell[r]{Recall\\lokalne} & \makecell[r]{Zgłoszone\\punkty [\%]} & PR-AUC \\
 \midrule
-Cardio & dane oryginalne & OCSVM & 0,971 & 0,620 & 0,596 \\
- & PCA & OCSVM & 0,910 & 0,642 & 0,663 \\
- & UMAP & OCSVM & 0,854 & 0,745 & 0,836 \\
- & autoenkoder & OCSVM & 0,988 & 0,599 & 0,624 \\
-Arrhythmia & dane oryginalne & IForest & 0,838 & 0,203 & 0,583 \\
- & PCA & LOF & 0,874 & 0,217 & 0,588 \\
- & UMAP & LOF & 0,657 & 0,238 & 0,365 \\
- & autoenkoder & LOF & 0,886 & 0,281 & 0,597 \\
-WDBC & dane oryginalne & LOF & 0,955 & 0,580 & 0,705 \\
- & PCA & LOF & 1,000 & 0,759 & 0,916 \\
- & UMAP & OCSVM & 0,955 & 0,741 & 0,668 \\
- & autoenkoder & LOF & 0,955 & 0,592 & 0,754 \\
-Campaign & dane oryginalne & IForest & 0,831 & 0,278 & 0,292 \\
- & PCA & IForest & 0,851 & 0,231 & 0,303 \\
- & UMAP & IForest & 0,628 & 0,328 & 0,229 \\
- & autoenkoder & błąd rekonstrukcji & 0,995 & 0,522 & 0,294 \\
+Cardio & dane oryginalne & OCSVM & 0,971 & 0,620 & 13,3 & 0,596 \\
+ & PCA & OCSVM & 0,910 & 0,642 & 11,9 & 0,663 \\
+ & UMAP & OCSVM & 0,854 & 0,745 & 9,4 & 0,836 \\
+ & autoenkoder & OCSVM & 0,988 & 0,599 & 12,8 & 0,624 \\
+Arrhythmia & dane oryginalne & IForest & 0,838 & 0,203 & 15,2 & 0,583 \\
+ & PCA & LOF & 0,874 & 0,217 & 14,3 & 0,588 \\
+ & UMAP & LOF & 0,657 & 0,238 & 19,6 & 0,365 \\
+ & autoenkoder & LOF & 0,886 & 0,281 & 18,3 & 0,597 \\
+WDBC & dane oryginalne & LOF & 0,955 & 0,580 & 4,6 & 0,705 \\
+ & PCA & LOF & 1,000 & 0,759 & 3,4 & 0,916 \\
+ & UMAP & OCSVM & 0,955 & 0,741 & 5,7 & 0,668 \\
+ & autoenkoder & LOF & 0,955 & 0,592 & 4,5 & 0,754 \\
+Campaign & dane oryginalne & IForest & 0,831 & 0,278 & 11,3 & 0,292 \\
+ & PCA & IForest & 0,851 & 0,231 & 8,5 & 0,303 \\
+ & UMAP & IForest & 0,628 & 0,328 & 12,4 & 0,229 \\
+ & autoenkoder & błąd rekonstrukcji & 0,995 & 0,522 & 21,5 & 0,294 \\
 \bottomrule
 \end{tabular}

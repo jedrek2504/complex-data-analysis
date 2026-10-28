@@ -13,6 +13,7 @@ import json
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.lines import Line2D
 import pandas as pd
 
 from common import ROOT
@@ -237,7 +238,8 @@ def table_ae_architecture(runs, structure):
 
 def table_types(best):
     """Recall of global and local anomalies of the best detector (validation
-    PR-AUC) in every representation."""
+    PR-AUC) in every representation, with the share of flagged test points
+    (recall depends on the threshold, so it is compared together with it)."""
     chosen = best_per_rep(best)
     rows = []
     for d in TASK2_DATASETS:
@@ -247,8 +249,9 @@ def table_types(best):
                          "Reprezentacja": REP_LABEL[rep], "Detektor": DET_LABEL[r.detector],
                          "\\makecell[r]{Recall\\\\globalne}": r.test_recall_global,
                          "\\makecell[r]{Recall\\\\lokalne}": r.test_recall_local,
+                         "\\makecell[r]{Zgłoszone\\\\punkty [\\%]}": num(100 * r.test_flagged, 1),
                          "PR-AUC": r.test_pr_auc})
-    tabular(pd.DataFrame(rows), TAB / "recall_by_type.tex", align="lllrrr")
+    tabular(pd.DataFrame(rows), TAB / "recall_by_type.tex", align="lllrrrr")
 
 
 def table_pca_types(runs, structure):
@@ -537,15 +540,17 @@ def fig_time(tq):
         a1.scatter(s.t.mean(), s.test_pr_auc.mean(), s=110 if rep == "Original" else 70,
                    color=st["color"], marker=st["marker"], edgecolor="black", lw=0.5,
                    zorder=3)
-        below = rep == "Original"
-        a1.annotate(REP_LABEL[rep], (s.t.mean(), s.test_pr_auc.mean()),
-                    xytext=(0, -16 if below else 8), textcoords="offset points",
-                    ha="center", fontsize=10)
         if rep != "Original":  # no representation to compute
             line(a2, [n_train[d] for d in order], s.t_rep.loc[order].values, st,
                  REP_LABEL[rep])
+    # one legend above both panels: in (b) a legend inside the axes covers the lines
+    handles = [Line2D([], [], color=REP_STYLE[r]["color"], marker=REP_STYLE[r]["marker"],
+                      ls="none" if r == "Original" else REP_STYLE[r]["ls"],
+                      markersize=10 if r == "Original" else 7, label=REP_LABEL[r])
+               for r in REPS]
+    fig.legend(handles=handles, loc="lower center", ncol=4, bbox_to_anchor=(0.5, 1.0))
     a1.set_xscale("log")
-    a1.set_xlabel("czas reprezentacji i detekcji [ms]\n(punkt: średnio, kreska: od--do)")
+    a1.set_xlabel("czas reprezentacji i detekcji [ms]\n(punkt: średnio, kreska: od–do)")
     a1.set_ylabel("PR-AUC (test), średnio")
     a1.set_ylim(0.3, 0.75)
     a1.set_title("(a) jakość a czas, 4 zbiory danych")
@@ -554,7 +559,6 @@ def fig_time(tq):
     a2.set_xlabel("liczba punktów uczących")
     a2.set_ylabel("czas reprezentacji [ms]")
     a2.set_title("(b) czas a wielkość zbioru danych")
-    a2.legend(fontsize=9.5, loc="upper left")
     fig.subplots_adjust(wspace=0.35)
     save(fig, FIG / "time_vs_quality")
 

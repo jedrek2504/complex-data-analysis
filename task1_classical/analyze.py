@@ -14,6 +14,7 @@ import json
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from sklearn.metrics import roc_auc_score
 
 from common.agreement import jaccard_matrix
 from common.datasets import DISPLAY_NAMES, SPECS, TASK1_DATASETS
@@ -153,33 +154,68 @@ def table_accuracy_trap(best, preds):
 
 
 def table_kinds(preds):
+    """Recall of global and local anomalies at the validation threshold, with
+    the share of flagged test points (a higher share buys a higher recall)."""
     sub = preds[preds.y == 1]
     rec = (
         sub.groupby(["dataset", "kind", "method"]).pred.mean().unstack()[list(METHODS)]
     )
+    flagged = preds.groupby(["dataset", "method"]).pred.mean().unstack()[list(METHODS)]
     counts = sub[sub.method == "IForest"].groupby(["dataset", "kind"]).size()
     rows = []
     for d in TASK1_DATASETS:
         for i, k in enumerate(("global", "local")):
             r = rec.loc[(d, k)]
-            cells = {
-                m: (
-                    f"\\textbf{{{num(100 * v, 0)}}}"
-                    if np.isclose(v, r.max())
-                    else num(100 * v, 0)
-                )
-                for m, v in r.items()
-            }
             rows.append(
                 {
                     "Zbiór danych": DISPLAY_NAMES[d] if i == 0 else "",
-                    "Typ": {"global": "globalne", "local": "lokalne"}[k],
+                    "Miara [\\%]": {"global": "Recall: globalne", "local": "Recall: lokalne"}[k],
                     "Liczba": str(counts[(d, k)]),
-                    **cells,
+                    **{m: num(100 * v, 0) for m, v in r.items()},
                 }
             )
+        rows.append(
+            {
+                "Zbiór danych": "",
+                "Miara [\\%]": "zgłoszone punkty",
+                "Liczba": "--",
+                **{m: num(100 * v, 0) for m, v in flagged.loc[d].items()},
+            }
+        )
     tabular(pd.DataFrame(rows), TAB / "recall_by_kind.tex", align="llr" + "r" * 5)
     return rec
+
+
+def auc_by_kind(preds):
+    """Threshold-free view: ROC-AUC of the anomalies of one type against all
+    normal test points (mean over the splits that contain that type)."""
+    rows = []
+    for (d, m, seed), g in preds.groupby(["dataset", "method", "seed"]):
+        normal = g[g.y == 0].score.values
+        for k in ("global", "local"):
+            a = g[g.kind == k].score.values
+            if len(a):
+                y = np.r_[np.zeros(len(normal)), np.ones(len(a))]
+                rows.append({"dataset": d, "method": m, "kind": k,
+                             "auc": roc_auc_score(y, np.r_[normal, a])})
+    auc = (pd.DataFrame(rows).groupby(["dataset", "kind", "method"]).auc.mean()
+           .unstack()[list(METHODS)])
+    out = []
+    for d in TASK1_DATASETS:
+        for i, k in enumerate(("global", "local")):
+            r = auc.loc[(d, k)]
+            out.append(
+                {
+                    "Zbiór danych": DISPLAY_NAMES[d] if i == 0 else "",
+                    "Typ": {"global": "globalne", "local": "lokalne"}[k],
+                    **{
+                        m: f"\\textbf{{{num(v, 2)}}}" if np.isclose(v, r.max()) else num(v, 2)
+                        for m, v in r.items()
+                    },
+                }
+            )
+    tabular(pd.DataFrame(out), TAB / "auc_by_kind.tex", align="ll" + "r" * 5)
+    return auc
 
 
 def table_param_effect(grid, method):
@@ -423,7 +459,7 @@ def fig_best(best):
     save(fig, FIG / "best_comparison")
 
 
-def fig_kinds(rec):
+def fig_kinds(auc):
     fig, axes = plt.subplots(1, 2, figsize=(WIDTH, 3.0), sharey=True)
     width = 0.16
     for ax, kind, title in (
@@ -432,7 +468,7 @@ def fig_kinds(rec):
     ):
         for i, m in enumerate(METHODS):
             st = METHOD_STYLE[m]
-            vals = [rec.loc[(d, kind), m] for d in TASK1_DATASETS]
+            vals = [auc.loc[(d, kind), m] for d in TASK1_DATASETS]
             ax.bar(
                 np.arange(5) + (i - 2) * width,
                 vals,
@@ -443,12 +479,13 @@ def fig_kinds(rec):
                 lw=0.5,
                 label=m,
             )
+        ax.axhline(0.5, color="black", lw=1.2, ls=":")
         ax.set_xticks(range(5), NAMES, rotation=30, ha="right")
         ax.set_title(title)
         ax.set_ylim(0, 1.05)
-    axes[0].set_ylabel("Recall (test)")
+    axes[0].set_ylabel("ROC-AUC typu (test)")
     axes[0].legend(ncol=5, loc="upper center", bbox_to_anchor=(1.05, 1.25))
-    save(fig, FIG / "recall_by_kind")
+    save(fig, FIG / "auc_by_kind")
 
 
 def jaccard_by_dataset(preds):
@@ -568,7 +605,8 @@ def main():
     agg = table_best(best)
     agg.to_csv(OUT / "best_summary.csv", index=False)
     table_accuracy_trap(best, preds)
-    rec = table_kinds(preds)
+    table_kinds(preds)
+    auc = auc_by_kind(preds)
     for method in METHODS:
         table_param_effect(grid, method)
     table_contamination(grid)
@@ -581,7 +619,7 @@ def main():
     fig_ocsvm(grid)
     fig_dbscan(grid)
     fig_best(best)
-    fig_kinds(rec)
+    fig_kinds(auc)
     fig_jaccard(preds)
     tq = time_summary(best)
     table_time(tq)

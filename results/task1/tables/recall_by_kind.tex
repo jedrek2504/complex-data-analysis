@@ -1,16 +1,21 @@
 \begin{tabular}{llrrrrrr}
 \toprule
-Zbiór danych & Typ & Liczba & IForest & LOF & COF & OCSVM & DBSCAN \\
+Zbiór danych & Miara [\%] & Liczba & IForest & LOF & COF & OCSVM & DBSCAN \\
 \midrule
-Breastw & globalne & 385 & 98 & 89 & 97 & 97 & \textbf{100} \\
- & lokalne & 215 & 93 & 95 & \textbf{100} & 93 & 87 \\
-Mammography & globalne & 50 & 96 & \textbf{100} & 96 & \textbf{100} & \textbf{100} \\
- & lokalne & 600 & 20 & 16 & 11 & \textbf{27} & 17 \\
-Wine & globalne & 6 & \textbf{100} & \textbf{100} & \textbf{100} & \textbf{100} & \textbf{100} \\
- & lokalne & 84 & 40 & 60 & 42 & \textbf{74} & 68 \\
-Statlog Heart & globalne & 9 & \textbf{100} & \textbf{100} & \textbf{100} & \textbf{100} & \textbf{100} \\
- & lokalne & 51 & 22 & \textbf{39} & 33 & 33 & 33 \\
-Cardio & globalne & 145 & 92 & 96 & 59 & 92 & \textbf{100} \\
- & lokalne & 295 & 60 & \textbf{79} & 30 & 66 & 31 \\
+Breastw & Recall: globalne & 385 & 98 & 89 & 97 & 97 & 100 \\
+ & Recall: lokalne & 215 & 93 & 95 & 100 & 93 & 87 \\
+ & zgłoszone punkty & -- & 38 & 75 & 79 & 39 & 36 \\
+Mammography & Recall: globalne & 50 & 96 & 100 & 96 & 100 & 100 \\
+ & Recall: lokalne & 600 & 20 & 16 & 11 & 27 & 17 \\
+ & zgłoszone punkty & -- & 3 & 2 & 2 & 3 & 1 \\
+Wine & Recall: globalne & 6 & 100 & 100 & 100 & 100 & 100 \\
+ & Recall: lokalne & 84 & 40 & 60 & 42 & 74 & 68 \\
+ & zgłoszone punkty & -- & 15 & 16 & 25 & 9 & 15 \\
+Statlog Heart & Recall: globalne & 9 & 100 & 100 & 100 & 100 & 100 \\
+ & Recall: lokalne & 51 & 22 & 39 & 33 & 33 & 33 \\
+ & zgłoszone punkty & -- & 12 & 11 & 14 & 12 & 9 \\
+Cardio & Recall: globalne & 145 & 92 & 96 & 59 & 92 & 100 \\
+ & Recall: lokalne & 295 & 60 & 79 & 30 & 66 & 31 \\
+ & zgłoszone punkty & -- & 14 & 31 & 29 & 10 & 9 \\
 \bottomrule
 \end{tabular}

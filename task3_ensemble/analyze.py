@@ -39,7 +39,9 @@ REP_LABEL = {"Original": "oryginalna", "PCA": "PCA", "UMAP": "UMAP", "AE": "auto
 
 
 def signed(v, digits=3):
-    return ("+" if v >= 0 else "") + num(v, digits)
+    if round(v, digits) == 0:
+        return num(0.0, digits)
+    return ("+" if v > 0 else "") + num(v, digits)
 
 
 def summary(variants):
@@ -208,6 +210,23 @@ def table_confirmation(variants, confirm):
         t = df[df.variant.isin(names)].groupby(["variant", "dataset"])[["pr_auc", "f1"]].mean()
         per_ds.append(t.assign(seeds=label))
     pd.concat(per_ds).to_csv(OUT / "confirmation.csv")
+
+
+def table_paired(variants, confirm):
+    """Per split: PR-AUC of an ensemble minus the best single detector chosen
+    on validation; mean difference and the number of splits won : lost."""
+    rows = []
+    for label, df in (("projektowe", variants), ("nowe", confirm)):
+        for i, v in enumerate(("DSF", "CBF", "Fusion skill", "Fusion mean")):
+            r = {"Podziały": label if i == 0 else "", "Wariant": ROW_LABEL.get(v, v)}
+            for d in TASK3_DATASETS:
+                sub = df[(df.dataset == d) & df.variant.isin([v, "best-single"])]
+                p_ = sub.pivot(index="seed", columns="variant", values="pr_auc")
+                diff = (p_[v] - p_["best-single"]).round(6)
+                r[DISPLAY_NAMES[d]] = (f"{signed(diff.mean())} "
+                                       f"({int((diff > 0).sum())}:{int((diff < 0).sum())})")
+            rows.append(r)
+    tabular(pd.DataFrame(rows), TAB / "paired_gain.tex", align="llrrrr")
 
 
 # ------------------------------------------------------------------ figures
@@ -512,7 +531,9 @@ def main():
     abl = table_ablation(variants)
     table_cases(dec)
     table_normalisation(variants)
-    table_confirmation(variants, pd.read_csv(OUT / "confirm" / "variants.csv"))
+    confirm = pd.read_csv(OUT / "confirm" / "variants.csv")
+    table_confirmation(variants, confirm)
+    table_paired(variants, confirm)
     table_key(summ)
     fig_key(summ)
     fig_jaccard()

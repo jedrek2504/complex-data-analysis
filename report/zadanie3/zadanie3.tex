@@ -145,7 +145,9 @@ walidacyjnej, bez etykiet.
 
 \textbf{Fuzja przez maksimum: dopasowanie na walidacji $\Rightarrow$ PR-AUC
 0,412 $\rightarrow$ 0,524 (rangi) i 0,483 $\rightarrow$ 0,576 (z-score)}
-(tabela~\ref{tab:norm}).
+(tabela~\ref{tab:norm}). Dopasowanie na walidacji pomaga w 7 z 8 połączeń;
+wyjątkiem jest zwykła średnia z rangami, która z rangami z części uczącej
+wypada nieco lepiej (0,637 wobec 0,622).
 
 \FloatBarrier
 \subsection{Majority Voting (głosowanie większościowe)}
@@ -248,10 +250,13 @@ warianty są w aneksie~\ref{app:full}.
 \end{figure}
 
 \textbf{Najlepsze zespoły (DSF, CBF) są średnio tak samo dobre jak najlepszy
-pojedynczy detektor (0,651--0,652 wobec 0,654)}, ale wygrywają na trzech
-zbiorach danych: Cardio (DSF 0,872 wobec 0,836), Arrhythmia (CBF 0,604 wobec
-0,590) i Campaign (DSF 0,328 wobec 0,303). \textbf{Na WDBC wszystkie zespoły
-przegrywają} (najlepszy CBF 0,851 wobec 0,886). Zespół kosztuje sumę czasów
+pojedynczy detektor (0,651--0,652 wobec 0,654).} Średnio są lepsze na Cardio
+(DSF 0,872 wobec 0,836), Arrhythmii (CBF 0,604 wobec 0,590) i Campaign (DSF
+0,328 wobec 0,303), ale porównanie podział po podziale
+(tabela~\ref{tab:paired}) pokazuje, że pewny jest tylko zysk DSF na Campaign
+i -- słabiej -- na Cardio; na Arrhythmii różnica mieści się w rozrzucie.
+\textbf{Na WDBC wszystkie zespoły przegrywają} (najlepszy CBF 0,851 wobec
+0,886). Zespół kosztuje sumę czasów
 swoich detektorów: zwykła fuzja średnio 31~s wobec 1,2~s najlepszego
 pojedynczego, głównie przez OCSVM na Campaign.
 
@@ -405,10 +410,13 @@ zachowują się różnie zależnie od wielkości walidacji:
   \label{fig:det_dsf}
 \end{figure}
 
-\textbf{DSF na Cardio ma najmniej fałszywych alarmów spośród pokazanych
-wariantów (4 wobec 10 najlepszego pojedynczego), przy 31 zamiast 34 wykrytych
-anomaliach} (rys.~\ref{fig:det_dsf}): słabsze detektory ,,potwierdzają''
-wysokie wyniki OCSVM tylko dla prawdziwych anomalii.
+\textbf{DSF na Cardio ma w tym podziale najmniej fałszywych alarmów spośród
+pokazanych wariantów (4 wobec 10 najlepszego pojedynczego), przy 31 zamiast
+34 wykrytych anomaliach} (rys.~\ref{fig:det_dsf}). We wszystkich 10 podziałach
+łącznie DSF usuwa 57 z 88 fałszywych alarmów najlepszego pojedynczego
+detektora i dodaje 15, ale traci 37 anomalii i ratuje 23
+(tabela~\ref{tab:cases}): słabsze detektory ,,potwierdzają'' wysokie wyniki
+OCSVM głównie dla prawdziwych anomalii.
 
 \begin{figure}[H]
   \centering
@@ -498,9 +506,31 @@ użyto przy projektowaniu zespołów.
 \textbf{Na nowych podziałach CBF ma najwyższą średnią PR-AUC (0,628 wobec
 0,620 najlepszego pojedynczego)}, a DSF i CBF wygrywają na 2 z 4 zbiorów
 danych i mają wyższe F1 (0,579--0,580 wobec 0,565; tabela~\ref{tab:confirm}).
-Kierunek jest ten sam co na podziałach projektowych: DSF wygrywa na Cardio
-i Campaign, CBF na WDBC i Campaign. Różnice średnich (ok. 0,01) są jednak
-mniejsze niż rozrzut między podziałami na Arrhythmii i WDBC (0,13--0,20).
+Różnice średnich (ok. 0,01) są jednak mniejsze niż rozrzut między podziałami
+na Arrhythmii i WDBC (0,13--0,20), dlatego tabela~\ref{tab:paired} porównuje
+warianty z najlepszym pojedynczym detektorem w każdym podziale osobno.
+
+\begin{table}[H]
+  \centering\small
+  \caption{Zmiana PR-AUC zespołu względem najlepszego pojedynczego detektora,
+  średnio po podziałach; w nawiasie -- w ilu podziałach zespół był lepszy :
+  gorszy (pozostałe to remisy).}
+  \label{tab:paired}
+  \fittab{paired_gain}
+\end{table}
+
+\begin{itemize}
+  \item \textbf{Pewny zysk: DSF na Campaign} (+0,025--0,026, lepszy we
+  wszystkich 5 podziałach projektowych i 5 nowych) \textbf{i na Cardio}
+  (+0,037--0,050, lepszy w 6--7 z 10 podziałów).
+  \item \textbf{Pewna strata: DSF i zwykła średnia na WDBC} (DSF gorszy w 14--15
+  z 30 podziałów, lepszy w 1--3).
+  \item \textbf{Bez rozstrzygnięcia: Arrhythmia i CBF.} Na Arrhythmii znak
+  zmiany odwraca się między podziałami projektowymi a nowymi. CBF na Cardio
+  podejmuje te same decyzje co najlepszy detektor (używa tylko OCSVM), a na
+  WDBC raz przegrywa ($-0{,}036$), raz wygrywa ($+0{,}013$); w ponad połowie
+  podziałów remisuje.
+\end{itemize}
 
 \FloatBarrier
 \subsection{Porównanie z zadaniami 1 i 2}
@@ -567,7 +597,7 @@ podniósł średnią PR-AUC z 0,511 (Isolation Forest) do 0,658.
   na poszczególnych zbiorach danych różnią się bardziej (0,33--0,93) niż
   efekt któregokolwiek wyboru. Na Campaign, gdzie ,,anomalie'' (klienci
   zakładający lokatę) nie odstają od reszty danych, żaden wybór nie dał
-  więcej niż 0,34 przy zgadywaniu 0,11.
+  więcej niż 0,35 przy zgadywaniu 0,11.
 \end{enumerate}
 
 \FloatBarrier
@@ -623,25 +653,34 @@ Najważniejsze wnioski z zadania, każdy poparty liczbami z sekcji~5 i 6.
 \begin{enumerate}
   \item \textbf{Zespół nie jest automatycznie lepszy od najlepszego
   detektora.} DSF i CBF są średnio tak samo dobre (0,651--0,652 wobec
-  0,654); wygrywają na Cardio, Arrhythmii i Campaign (o 0,01--0,04)
-  i przegrywają na WDBC.
-  \item \textbf{O zysku decyduje relacja jakości i różnorodności detektorów
-  oraz wielkość walidacji.} Słabsze detektory pomagają, gdy potwierdzają
-  trafienia dobrego (Cardio, DSF: 4 zamiast 10 fałszywych alarmów), a
-  szkodzą, gdy rozmywają prawie bezbłędny sygnał (WDBC).
+  0,654). Porównanie podział po podziale potwierdza tylko zysk DSF na
+  Campaign (+0,026, lepszy w 5 z 5 podziałów, także na nowych) i Cardio
+  (+0,04--0,05, w 6--7 z 10); na Arrhythmii różnica mieści się w rozrzucie,
+  a na WDBC DSF i zwykła średnia wyraźnie przegrywają.
+  \item \textbf{O zysku decyduje relacja jakości i różnorodności detektorów.}
+  Słabsze detektory pomagają, gdy potwierdzają trafienia dobrego (Cardio,
+  DSF: we wszystkich podziałach łącznie 57 z 88 fałszywych alarmów usuniętych,
+  15 dodanych), a szkodzą, gdy rozmywają prawie bezbłędny sygnał (WDBC:
+  zwykła średnia $-0{,}10$).
   \item \textbf{Wybór detektorów jest ważniejszy niż wagi}: zachłanny wybór
   daje do +0,021, a fuzja wszystkich detektorów do $-0{,}068$; wagi zmieniają
   wynik najwyżej o 0,03.
-  \item \textbf{Normalizację dopasowywać na wynikach walidacji, a nie części
-  uczącej}: fuzja przez maksimum zyskuje na tym 0,11 PR-AUC.
-  \item \textbf{Majority Voting daje stabilne decyzje, ale słaby ranking}:
-  na Campaign F1 0,375 wobec 0,318 najlepszego pojedynczego, ale najniższa
-  średnia PR-AUC wśród głównych wariantów (0,545).
-  \item \textbf{DSF sprawdza się przy dużej walidacji, CBF przy małej}; na
-  nowych podziałach CBF miał najwyższą średnią PR-AUC (0,628).
-  Rekomendacja: przy kilku anomaliach w walidacji użyć CBF albo pojedynczego
-  detektora, przy dziesiątkach -- DSF; nie łączyć wszystkich detektorów bez
-  kontroli jakości.
+  \item \textbf{Normalizację zwykle lepiej dopasowywać na wynikach walidacji
+  niż części uczącej}: pomaga to w 7 z 8 połączeń, najbardziej fuzji przez
+  maksimum z rangami (+0,11 PR-AUC); wyjątkiem jest zwykła średnia z rangami
+  (0,622 wobec 0,637).
+  \item \textbf{Majority Voting ma słaby ranking i nie poprawia decyzji}:
+  najniższa średnia PR-AUC wśród głównych wariantów (0,545) i niższe średnie
+  F1 niż najlepszy pojedynczy detektor (0,572 wobec 0,599); wyższe F1 ma tylko
+  na Campaign (0,375 wobec 0,318).
+  \item \textbf{DSF i CBF wygrywają w innych warunkach}: DSF jest lepszy od
+  CBF na Cardio (+0,04--0,06), gdzie walidacja ma 44 anomalie, a CBF od DSF na
+  WDBC (+0,05--0,08), gdzie ma 2--3; na Arrhythmii i Campaign remisują.
+  Na nowych podziałach CBF miał najwyższą średnią PR-AUC (0,628), ale tylko
+  o 0,008 wyższą niż najlepszy pojedynczy detektor. Rekomendacja: przy kilku
+  anomaliach w walidacji użyć CBF albo pojedynczego detektora, a DSF tam,
+  gdzie walidacja pozwala ocenić detektory; nie łączyć wszystkich detektorów
+  bez kontroli jakości.
   \item \textbf{W całym projekcie o jakości decydowały kolejno}: natura
   danych, dobór pary algorytm--reprezentacja, a dopiero na końcu połączenie
   detektorów.

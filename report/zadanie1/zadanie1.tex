@@ -376,8 +376,11 @@ na wynik.
 0,10 $\rightarrow$ 0,49.} Anomalie Wine tworzą małą grupę (ok. 5 punktów w
 części uczącej). Przy $k=5$ sąsiadami anomalii są inne anomalie, więc wyglądają
 normalnie; dopiero większe $k$ sięga do obserwacji normalnych. Na Breastw LOF
-jest słaby przy każdym $k$ (najwyżej 0,43 przy poziomie zgadywania 0,35), bo
-239 anomalii tworzy tam własny gęsty obszar.
+jest słaby przy każdym $k$ (najwyżej 0,43 przy poziomie zgadywania 0,35).
+239 anomalii zajmuje tam duży, równomiernie rzadki obszar: ich odległość do
+10. sąsiada jest prawie sześć razy większa niż obserwacji normalnych (mediana
+2,7 wobec 0,46). Sąsiadami anomalii są inne, równie rzadko rozłożone
+anomalie, więc na ich tle anomalia wygląda zwyczajnie (wynik LOF bliski 1).
 
 \begin{figure}[H]
   \centering
@@ -389,10 +392,12 @@ jest słaby przy każdym $k$ (najwyżej 0,43 przy poziomie zgadywania 0,35), bo
 \textbf{LOF wykrywa najwięcej anomalii Cardio (41 z 44), ale kosztem wielu
 fałszywych alarmów: 119 na Cardio i 74 na Breastw}
 (rys.~\ref{fig:det_lof}). Zgłasza każdy punkt, który jest rzadszy od swoich
-sąsiadów, także na obrzeżach danych normalnych. W Breastw ponad połowa
-obserwacji normalnych (52\,\%) to powtórzone, identyczne rekordy. Ich gęstość
-jest ogromna, więc zwykły punkt obok nich wygląda na dużo rzadszy od
-sąsiadów.
+sąsiadów, także na obrzeżach danych normalnych. W Breastw dochodzi do tego
+drugi powód: ponad połowa obserwacji normalnych (52\,\%) to powtórzone,
+identyczne rekordy. Ich gęstość jest ogromna, więc zwykły punkt obok nich
+wygląda na dużo rzadszy od sąsiadów. Duplikaty wyjaśniają jednak tylko część
+problemu: gdy LOF uczy się na części uczącej bez powtórzeń, PR-AUC rośnie
+z 0,43 tylko do 0,55.
 
 \FloatBarrier
 \subsubsection{COF}
@@ -544,8 +549,9 @@ $\varepsilon$ (przez kwantyl $q_\varepsilon$) i parametru minPts.
 \textbf{Promień $\varepsilon$ decyduje o tym, ile punktów jest szumem, a F1 jest
 najlepsze, gdy szumu jest mniej więcej tyle, ile anomalii}: Breastw 44\,\%
 szumu przy 35\,\% anomalii (F1 0,89), Cardio 12\,\% przy 9,6\,\% (0,52),
-Mammography 2,5\,\% przy 2,3\,\% (0,26). minPts musi być większe niż grupka
-anomalii: na Wine walidacja wybiera minPts~$\ge 10$, bo przy mniejszym anomalie
+Mammography 2,5\,\% przy 2,3\,\% (0,26). Promień zmienia też to, które punkty
+są rdzeniem grup, a więc i sam ranking: na Wine PR-AUC zmienia się z nim
+nawet o 0,51. minPts musi być większe niż grupka anomalii: na Wine walidacja wybiera minPts~$\ge 10$, bo przy mniejszym anomalie
 tworzą własną grupę i nie są szumem.
 
 \begin{figure}[H]
@@ -613,10 +619,12 @@ $\Rightarrow$ Recall 0,14 $\rightarrow$ 0,74, Precision 0,31 $\rightarrow$
 0,22.} Ranking obserwacji się nie zmienia, przesuwa się tylko próg. Precision
 nie spada na Breastw, gdzie nawet $c=0{,}35$ jest mniejsze od prawdziwego
 udziału anomalii, a na Wine najpierw rośnie, bo przy $c=0{,}02$ detektor
-zgłasza tylko 1--2 punkty, zwykle nietrafione. Wybrane na walidacji $c$ jest zwykle bliskie prawdziwemu
-udziałowi anomalii (tabela~\ref{tab:cont}); wyjątkiem są LOF i COF na Cardio,
-które przy słabym rankingu ,,łapią'' anomalie dopiero przy bardzo wielu
-zgłoszeniach.
+zgłasza tylko 1--2 punkty, zwykle nietrafione. Wybrane na walidacji $c$ jest
+równe prawdziwemu udziałowi anomalii na Breastw i Mammography, ale na Wine,
+Statlog Heart i Cardio (IForest) jest od niego 1,5--2 razy większe
+(tabela~\ref{tab:cont}). LOF i COF na Cardio przy słabym rankingu ,,łapią''
+anomalie dopiero przy bardzo wielu zgłoszeniach ($c=0{,}35$ przy udziale
+9,6\,\%).
 
 \FloatBarrier
 \subsection{Porównanie najlepszych konfiguracji}
@@ -647,11 +655,14 @@ Tu zestawiono wszystkie metody z ustawieniami i progami wybranymi na walidacji.
   \fittab{detected_counts}
 \end{table}
 
-\textbf{Żadna metoda nie wygrywa wszędzie}: OCSVM jest najlepszy na Cardio
-(0,76) i Wine (0,89), DBSCAN na Breastw (0,99) i Mammography (0,23), a na
-Statlog Heart wszystkie metody mają 0,39--0,44 przy odchyleniu ok. 0,24, więc
-nie da się ich uporządkować. LOF i COF są najsłabsze tam, gdzie anomalie
-tworzą duże skupisko (Breastw). Tabela~\ref{tab:detected} pokazuje to samo
+\textbf{Żadna metoda nie wygrywa wszędzie}: OCSVM jest wyraźnie najlepszy na
+Cardio (0,76; lepszy od drugiego IForest w 10 z 10 podziałów) i Wine (0,89;
+25 z 30 podziałów), DBSCAN na Breastw (0,99; o 0,015 lepszy od IForest
+w 9 z 10 podziałów). Na Mammography trzy najlepsze metody są nie do
+odróżnienia (DBSCAN 0,23, OCSVM 0,22, IForest 0,21; DBSCAN lepszy od OCSVM
+tylko w 7 z 10 podziałów, średnio o 0,01), a na Statlog Heart wszystkie mają
+0,39--0,44 przy odchyleniu ok. 0,24. LOF i COF są najsłabsze na Breastw,
+gdzie anomalie zajmują duży, równomiernie rzadki obszar. Tabela~\ref{tab:detected} pokazuje to samo
 w liczbach: na Breastw LOF i COF wykrywają prawie wszystkie anomalie, ale
 zgłaszają przy tym 73--74 fałszywe alarmy, a na Mammography każda metoda
 przeocza od 42 do 50 z 65 anomalii.
@@ -672,26 +683,57 @@ punktom (\emph{odporna odległość Mahalanobisa}). Anomalia jest
 z ciśnieniem 250 przy normie 120--140 to anomalia globalna; pacjent
 o typowych wartościach każdej cechy, ale nietypowym ich połączeniu -- lokalna.
 
+Odsetek wykrytych anomalii (Recall) zależy od progu: metoda, która zgłasza
+więcej punktów, wykrywa więcej anomalii każdego typu. Dlatego tabela~\ref{tab:kinds}
+podaje też odsetek zgłoszonych punktów, a rysunek~\ref{fig:kinds} pokazuje
+miarę niezależną od progu: ROC-AUC policzone osobno dla anomalii danego typu
+(szansa, że taka anomalia dostanie wyższy wynik niż losowa obserwacja
+normalna; 0,5 = zgadywanie).
+
 \begin{table}[H]
   \centering\small
-  \caption{Procent wykrytych anomalii globalnych i lokalnych (Liczba -- anomalie
-  danego typu zsumowane po częściach testowych wszystkich podziałów).}
+  \caption{Procent wykrytych anomalii globalnych i lokalnych przy progu
+  wybranym na walidacji oraz procent zgłoszonych punktów testowych (Liczba --
+  anomalie danego typu zsumowane po częściach testowych wszystkich podziałów).}
   \label{tab:kinds}
   \fittab{recall_by_kind}
 \end{table}
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=\textwidth]{\fig{recall_by_kind}}
-  \caption{Anomalie globalne wykrywają wszystkie metody, lokalne -- tylko niektóre.}
+  \includegraphics[width=\textwidth]{\fig{auc_by_kind}}
+  \caption{ROC-AUC osobno dla anomalii globalnych i lokalnych (linia kropkowana
+  -- zgadywanie): globalne są łatwe dla IForest, OCSVM i DBSCAN, lokalne są
+  trudniejsze dla każdej metody.}
   \label{fig:kinds}
 \end{figure}
 
-\textbf{Anomalie globalne wykrywa prawie każda metoda (89--100\,\%), a różnice
-dotyczą lokalnych}: na Cardio LOF wykrywa ich 79\,\%, OCSVM 66\,\%, IForest
-60\,\%, a DBSCAN i COF ok. 30\,\%. Na Mammography, gdzie 93\,\% anomalii jest
-lokalnych, żadna metoda nie przekracza 27\,\%, co tłumaczy niskie wyniki na
-tym zbiorze danych.
+\begin{table}[H]
+  \centering\small
+  \caption{ROC-AUC osobno dla anomalii globalnych i lokalnych (średnia po
+  podziałach; pogrubienie -- najlepsza metoda w wierszu).}
+  \label{tab:auc_kinds}
+  \fittab{auc_by_kind}
+\end{table}
+
+\begin{itemize}
+  \item \textbf{Anomalie globalne: IForest, OCSVM i DBSCAN mają ROC-AUC co
+  najmniej 0,96 na każdym zbiorze danych, a LOF i COF potrafią je przeoczyć}
+  (Breastw: 0,58 i 0,47; COF na Cardio i Wine: 0,78--0,79). LOF i COF
+  porównują punkt z sąsiadami, a sąsiadami anomalii globalnej bywają inne
+  anomalie.
+  \item \textbf{Anomalie lokalne są trudniejsze}: poza Breastw najlepsza
+  metoda ma dla nich ROC-AUC 0,78--0,97, a najsłabsza schodzi do 0,50 (COF na
+  Cardio). W rankingu najlepiej ustawiają je IForest (Breastw, Mammography,
+  Cardio) i OCSVM (Wine); na Statlog Heart wszystkie metody mają 0,76--0,78.
+  \item \textbf{Wyższy Recall nie oznacza lepszego rankingu}: LOF wykrywa na
+  Cardio 79\,\% anomalii lokalnych wobec 66\,\% dla OCSVM, ale zgłasza trzy razy
+  więcej punktów (31\,\% wobec 10\,\%), a w rankingu jest słabszy (0,81 wobec
+  0,90).
+\end{itemize}
+Na Mammography 93\,\% anomalii jest lokalnych i przy progu z walidacji
+żadna metoda nie wykrywa więcej niż 27\,\% z nich, co tłumaczy niskie wyniki
+na tym zbiorze danych.
 
 \FloatBarrier
 \subsection{Zgodność wykrytych zbiorów}
@@ -762,21 +804,30 @@ $T=500$.
 Najważniejsze wnioski z zadania, każdy poparty liczbami z sekcji~5.
 
 \begin{enumerate}
-  \item \textbf{Żadna metoda nie jest najlepsza wszędzie.} OCSVM wygrywa na
-  Cardio (PR-AUC 0,76) i Wine (0,89), DBSCAN na Breastw (0,99) i Mammography
-  (0,23).
-  \item \textbf{Największy wpływ ma dopasowanie metody do typu anomalii.}
-  Anomalie globalne wykrywa każda metoda (89--100\,\%); o wyniku decydują
-  lokalne, które najlepiej wykrywa LOF (Cardio: 79\,\% wobec ok. 30\,\% dla
-  DBSCAN i COF). Gdy anomalie tworzą duże skupisko (Breastw), LOF i COF
-  zawodzą (0,43 i 0,35).
+  \item \textbf{Żadna metoda nie jest najlepsza wszędzie.} OCSVM wyraźnie
+  wygrywa na Cardio (PR-AUC 0,76) i Wine (0,89), DBSCAN na Breastw (0,99).
+  Na Mammography trzy najlepsze metody są nie do odróżnienia (0,21--0,23),
+  a na Statlog Heart -- wszystkie pięć.
+  \item \textbf{O wyniku decydują anomalie lokalne.} Globalne ustawiają wysoko
+  w rankingu IForest, OCSVM i DBSCAN (ROC-AUC co najmniej 0,96 na każdym
+  zbiorze danych), a lokalne są trudniejsze dla każdej metody (poza Breastw
+  najlepsza ma dla nich 0,78--0,97, najsłabsza nawet 0,50).
+  LOF i COF potrafią przeoczyć nawet anomalie globalne: na Breastw, gdzie
+  anomalie zajmują duży, równomiernie rzadki obszar, mają ROC-AUC dla nich
+  0,58 i 0,47, a PR-AUC 0,43 i 0,35.
   \item \textbf{Parametry są równie ważne jak wybór metody, ale nie we
   wszystkich metodach.} OCSVM na Wine daje od 0,07 do 0,89 PR-AUC zależnie od
   jądra i $\gamma$, LOF od 0,10 do 0,49 zależnie od $k$, a Isolation Forest
   zmienia się najwyżej o 0,045 -- jest najbezpieczniejszy bez strojenia.
-  \item \textbf{Parametry progowe ($c$, $\nu$, $\varepsilon$) ustalają liczbę
-  zgłoszeń, a nie jakość rankingu.} Najlepsze F1 uzyskuje się, gdy odsetek
-  zgłoszeń jest bliski prawdziwemu udziałowi anomalii.
+  \item \textbf{Contamination $c$ ustala tylko liczbę zgłoszeń; $\nu$
+  i $\varepsilon$ zmieniają też ranking.} Przy stałym modelu $c$ nie zmienia
+  PR-AUC, a $\nu$ i $\varepsilon$ zmieniają sam model (PR-AUC OCSVM zmienia się
+  z $\nu$ nawet o 0,60 na Cardio, DBSCAN z $\varepsilon$ o 0,51 na Wine).
+  Najlepsze F1 daje odsetek zgłoszeń bliski prawdziwemu udziałowi anomalii, ale
+  tylko dla dobrych detektorów na większych zbiorach danych (Breastw,
+  Mammography, IForest na Cardio); na Wine i Statlog Heart optimum leży przy
+  2--4 razy większym odsetku, a słabe LOF i COF na Cardio osiągają najlepsze F1
+  przy $c=0{,}35$.
   \item \textbf{Accuracy nie nadaje się do oceny.} Na Mammography i Statlog
   Heart odpowiedź ,,wszystko normalne'' ma wyższą Accuracy niż najlepszy
   detektor; podstawą oceny powinny być PR-AUC i F1.

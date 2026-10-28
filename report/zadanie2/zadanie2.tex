@@ -240,6 +240,7 @@ danych normalnych niż 99\,\% obserwacji normalnych) i \emph{lokalnych}
 
 \FloatBarrier
 \section{Wyniki}
+\label{sec:results}
 
 W tej sekcji najpierw zestawiono wszystkie pary reprezentacja--detektor,
 potem omówiono każdą reprezentację osobno w tym samym układzie, a na końcu
@@ -267,7 +268,8 @@ PR-AUC, w obie strony}:
   \item \textbf{Cardio: UMAP $\Rightarrow$ OCSVM 0,60 $\rightarrow$ 0,84}
   (najlepszy wynik na tym zbiorze), ale LOF 0,31 $\rightarrow$ 0,24;
   \item \textbf{Arrhythmia: UMAP $\Rightarrow$ IForest 0,58 $\rightarrow$
-  0,33}, a autoenkoder i PCA poprawiają LOF i OCSVM o 0,09--0,14;
+  0,33}, a autoenkoder i PCA poprawiają LOF i OCSVM o 0,09--0,14 -- ale
+  tylko do poziomu IForest w danych oryginalnych (0,58);
   \item \textbf{Campaign: żadna reprezentacja nie pomaga} -- wszystkie pary
   mają 0,14--0,30 przy zgadywaniu 0,11.
 \end{itemize}
@@ -315,7 +317,9 @@ reprezentacji.
 alarmami; na Campaign IForest przeocza 763 z 1160 anomalii}
 (rys.~\ref{fig:det_original}). Anomalie Campaign leżą w tych samych
 obszarach co klienci, którzy lokaty nie założyli, więc żaden detektor nie
-odróżnia ich po położeniu.
+odróżnia ich po położeniu. Na Arrhythmii IForest wykrywa 6 z 16 anomalii
+przy 17 fałszywych alarmach, a na WDBC LOF wykrywa obie anomalie testowe przy
+2 fałszywych alarmach.
 
 \FloatBarrier
 \subsection{PCA}
@@ -339,10 +343,13 @@ monotoniczna} (rys.~\ref{fig:pca}):
   składowa dodaje tylko zmienność wśród guzów łagodnych.
   \item \textbf{Cardio: $k=1$ $\Rightarrow$ LOF 0,58} (w danych
   oryginalnych 0,31); OCSVM jest najlepszy przy $k=1$--5.
-  \item \textbf{Arrhythmia: $k=5$--10 $\Rightarrow$ LOF 0,59}, choć to
-  tylko 32--47\,\% wariancji. Przy 274 cechach odległości w danych
-  oryginalnych zagłusza szum setek słabych cech, a redukcja go usuwa. Przy
-  $k\le2$ wynik spada (0,34--0,40), bo znika też informacja o anomaliach.
+  \item \textbf{Arrhythmia: $k=5$--15 $\Rightarrow$ LOF 0,58--0,59} (w danych
+  oryginalnych 0,46), choć to tylko 32--57\,\% wariancji. Przy 274 cechach
+  odległości w danych oryginalnych zagłusza szum setek słabych cech, a
+  redukcja go usuwa. Tyle samo osiąga jednak IForest bez żadnej redukcji
+  (0,58), więc PCA pomaga tu LOF, a nie poprawia najlepszego wyniku na zbiorze.
+  Przy $k\le2$ wynik spada (0,34--0,40), bo znika też informacja o
+  anomaliach.
   \item \textbf{Campaign: $k$ prawie nie ma wpływu} (IForest 0,24--0,30).
 \end{itemize}
 Zachowana wariancja mierzy, jak wiernie odtwarzamy \emph{typowe} dane, a nie
@@ -374,10 +381,11 @@ danych. Ma przy tym niską trafność zgłoszeń (PR-AUC 0,24--0,47), bo równie
   \label{fig:det_pca}
 \end{figure}
 
-W porównaniu z danymi oryginalnymi \textbf{PCA przede wszystkim ogranicza
-fałszywe alarmy}: na Cardio OCSVM zgłasza 18 zamiast 36, a na Campaign
-IForest 592 zamiast 870 (rys.~\ref{fig:det_pca}), ale kosztem części
-wykrytych anomalii (Cardio: 29 zamiast 36, Campaign: 327 zamiast 397).
+W porównaniu z danymi oryginalnymi \textbf{PCA ogranicza fałszywe alarmy na
+każdym zbiorze danych}: Cardio 18 zamiast 36, Arrhythmia 12 zamiast 17, WDBC
+1 zamiast 2, Campaign 592 zamiast 870 (rys.~\ref{fig:det_pca}). Kosztem jest
+część wykrytych anomalii (Cardio 29 zamiast 36, Arrhythmia 5 zamiast 6,
+Campaign 327 zamiast 397); na WDBC obie anomalie są nadal wykryte.
 
 \FloatBarrier
 \subsection{UMAP}
@@ -425,8 +433,11 @@ danych, a UMAP odsuwa grupę zapisów patologicznych na brzeg.
 \end{figure}
 
 \textbf{Na Cardio OCSVM w UMAP ma najlepszą równowagę: 34 z 44 anomalii przy
-10 fałszywych alarmach} (w danych oryginalnych 36 i 36). Na Arrhythmii LOF
-w UMAP wykrywa tylko 4 z 16 anomalii (rys.~\ref{fig:det_umap}).
+10 fałszywych alarmach} (w danych oryginalnych 36 i 36). Na Arrhythmii
+i WDBC UMAP gubi anomalie: LOF wykrywa 4 z 16 (w danych oryginalnych 6),
+a OCSVM 1 z 2 (w danych oryginalnych 2). Na Campaign IForest wykrywa prawie
+tyle samo co w danych oryginalnych (390 wobec 397) przy mniejszej liczbie
+fałszywych alarmów (601 wobec 870; rys.~\ref{fig:det_umap}).
 
 \FloatBarrier
 \subsection{Autoenkoder}
@@ -443,12 +454,14 @@ Sprawdzono wpływ wymiaru przestrzeni ukrytej $z$ i architektury sieci.
 \end{figure}
 
 \textbf{Wymiar $z$ zmienia wynik najwyżej o 0,07} (rys.~\ref{fig:ae_latent},
-tabela~\ref{tab:spread}). Autoenkoder wyraźnie pomaga tylko na Arrhythmii
-(LOF 0,46 $\rightarrow$ 0,60), gdzie problemem jest nadmiar cech, i działa
-tam podobnie jak PCA (0,59). Na pozostałych zbiorach zyskuje mniej niż PCA
-(np. LOF na WDBC: 0,71 $\rightarrow$ 0,75, w PCA 0,92) albo traci: sieć uczy
-się odtwarzać dane, a nie zachowywać odległości, na których opierają się
-detektory.
+tabela~\ref{tab:spread}). \textbf{Autoenkoder nie daje lepszego wyniku niż
+PCA na żadnym zbiorze danych.} Na Arrhythmii poprawia LOF (0,46 $\rightarrow$
+0,60), ale tyle samo dają PCA (0,59) i IForest w danych oryginalnych (0,58);
+różnice mieszczą się w rozrzucie między podziałami (autoenkoder jest lepszy
+od PCA w 7 z 10 podziałów, średnio o 0,01). Na pozostałych zbiorach zyskuje
+mniej niż PCA (np. LOF na WDBC: 0,71 $\rightarrow$ 0,75, w PCA 0,92) albo
+traci: sieć uczy się odtwarzać dane, a nie zachowywać odległości, na których
+opierają się detektory.
 
 \begin{table}[H]
   \centering\small
@@ -478,7 +491,10 @@ w części uczącej tworzy własną grupę, którą sieć uczy się odtwarzać.
 autoenkodera: wykrywa 497 z 1160 anomalii (IForest w danych oryginalnych 397),
 ale zgłasza też 905 fałszywych alarmów} (rys.~\ref{fig:det_ae}). Na Cardio
 OCSVM w przestrzeni ukrytej wykrywa tyle samo anomalii co w danych
-oryginalnych (36), z mniejszą liczbą fałszywych alarmów (27 wobec 36).
+oryginalnych (36), z mniejszą liczbą fałszywych alarmów (27 wobec 36). Na
+Arrhythmii LOF wykrywa 5 z 16 anomalii przy 10 fałszywych alarmach (IForest
+w danych oryginalnych: 6 i 17), a na WDBC wynik jest taki sam jak w danych
+oryginalnych (obie anomalie, 2 fałszywe alarmy).
 
 \FloatBarrier
 \subsection{Co wykryto: porównanie reprezentacji}
@@ -495,9 +511,17 @@ Tabela~\ref{tab:detected} zbiera liczby z czterech map ,,co wykryto''.
 \end{table}
 
 \textbf{Reprezentacja zmienia głównie liczbę fałszywych alarmów, a mniej
-liczbę wykrytych anomalii}: na Cardio wszystkie cztery reprezentacje wykrywają
-29--36 z 44 anomalii, ale fałszywych alarmów jest od 10 (UMAP) do 36 (dane
-oryginalne).
+liczbę wykrytych anomalii}:
+\begin{itemize}
+  \item Cardio: 29--36 z 44 anomalii, fałszywych alarmów od 10 (UMAP) do 36
+  (dane oryginalne);
+  \item Arrhythmia: 4--6 z 16 anomalii, fałszywych alarmów od 10
+  (autoenkoder) do 17 (dane oryginalne i UMAP);
+  \item Campaign: 327--497 z 1160 anomalii, fałszywych alarmów od 592 (PCA)
+  do 905 (autoenkoder);
+  \item WDBC ma w tym podziale tylko 2 anomalie testowe: każda reprezentacja
+  poza UMAP wykrywa obie, przy 1--2 fałszywych alarmach.
+\end{itemize}
 
 \FloatBarrier
 \subsection{Wizualizacje 2D i separacja klas}
@@ -555,18 +579,53 @@ reprezentacji.
 \begin{table}[H]
   \centering\small
   \caption{Recall anomalii globalnych i lokalnych najlepszego (według
-  walidacji) detektora w każdej reprezentacji.}
+  walidacji) detektora w każdej reprezentacji. Zgłoszone punkty -- odsetek
+  obserwacji testowych zgłoszonych jako anomalie; im więcej zgłoszeń, tym
+  łatwiej o wysoki Recall.}
   \label{tab:types}
   \fittab{recall_by_type}
 \end{table}
 
-\textbf{UMAP obniża wykrywanie anomalii globalnych na każdym zbiorze danych}
-(Arrhythmia 0,84 $\rightarrow$ 0,66, Campaign 0,83 $\rightarrow$ 0,63,
-Cardio 0,97 $\rightarrow$ 0,85; tabela~\ref{tab:types}), bo traci informację
-o tym, \emph{jak daleko} anomalia leży. Anomalie lokalne zyskują na
-reprezentacji, która usuwa szum: PCA na WDBC (0,58 $\rightarrow$ 0,76)
-i UMAP na Cardio (0,62 $\rightarrow$ 0,75). Żadna para reprezentacja--detektor
-nie jest najlepsza dla obu typów na wszystkich zbiorach danych.
+\textbf{UMAP obniża Recall anomalii globalnych na trzech zbiorach danych
+z czterech}: Arrhythmia 0,84 $\rightarrow$ 0,66, Campaign 0,83 $\rightarrow$
+0,63, Cardio 0,97 $\rightarrow$ 0,85; na WDBC Recall się nie zmienia (0,955;
+tabela~\ref{tab:types}). Tabela~\ref{tab:umap_global} pokazuje, dlaczego.
+
+\begin{table}[H]
+  \centering\small
+  \caption{Anomalie globalne przed i po UMAP (dane oryginalne $\rightarrow$
+  UMAP, średnio po podziałach). Procenty -- jak często losowa anomalia
+  globalna leży dalej niż losowa obserwacja normalna (50\,\% -- brak różnicy)
+  od 10 najbliższych punktów uczących i od środka części uczącej. Detektor --
+  wybrany na walidacji w danych oryginalnych / w UMAP.}
+  \label{tab:umap_global}
+  \fittab{umap_global}
+\end{table}
+
+\begin{itemize}
+  \item \textbf{UMAP zaciera odległość od sąsiadów na każdym zbiorze danych}:
+  w danych oryginalnych anomalia globalna ma dalej do sąsiadów niż obserwacja
+  normalna w 93--100\,\% przypadków, po UMAP tylko w 38--71\,\%. UMAP
+  zachowuje to, kto jest czyim sąsiadem, ale nie to, jak daleko
+  (sekcja~\ref{sec:umap}).
+  \item \textbf{Arrhythmia i Campaign: anomalie globalne przestają też leżeć
+  na skraju danych} (93 $\rightarrow$ 62\,\% i 99 $\rightarrow$ 86\,\%), więc
+  detektor naprawdę je gubi: ROC-AUC spada z 0,95 do 0,83 i z 0,94 do 0,85,
+  w każdym podziale. Recall spada, choć detektor w UMAP zgłasza więcej
+  punktów (19,6 wobec 15,2\,\% i 12,4 wobec 11,3\,\%).
+  \item \textbf{Cardio i WDBC: anomalie globalne zostają na skraju mapy} (98
+  i 97\,\%), a OCSVM szuka właśnie punktów poza główną masą danych. Ustawia
+  je więc w rankingu prawie tak samo wysoko jak detektor w danych
+  oryginalnych (ROC-AUC 0,98; na WDBC wcześniej 1,00). Spadek Recall na
+  Cardio wynika tylko z progu: OCSVM w UMAP zgłasza mniej punktów (9,4 wobec
+  13,3\,\%).
+\end{itemize}
+
+Anomalie lokalne zyskują na reprezentacji, która usuwa szum: PCA na WDBC
+(0,58 $\rightarrow$ 0,76) i UMAP na Cardio (0,62 $\rightarrow$ 0,75), choć
+obie zgłaszają mniej punktów niż dane oryginalne (3,4 wobec 4,6\,\% i 9,4
+wobec 13,3\,\%). Żadna para reprezentacja--detektor nie jest najlepsza dla
+obu typów na wszystkich zbiorach danych.
 
 \FloatBarrier
 \subsection{Jakość a czas działania}
@@ -626,7 +685,7 @@ par zbiór--detektor, a o ponad 0,1 PR-AUC w sześciu.
 \section{Odpowiedzi na pytania analityczne}
 
 W tej sekcji krótko odpowiedziano na pięć pytań postawionych w zadaniu, na
-podstawie wyników z sekcji~5.
+podstawie wyników z sekcji~\ref{sec:results}.
 
 \begin{enumerate}[label=\alph*)]
   \item \textbf{Czy redukcja wymiarowości zawsze poprawia detekcję?} Nie.
@@ -681,27 +740,34 @@ dalej.
 \FloatBarrier
 \section{Wnioski}
 
-Najważniejsze wnioski z zadania, każdy poparty liczbami z sekcji~5.
+Najważniejsze wnioski z zadania, każdy poparty liczbami z
+sekcji~\ref{sec:results}.
 
 \begin{enumerate}
   \item \textbf{Reprezentacja ma duży wpływ, w obie strony.} Ten sam detektor
   zmienia PR-AUC o ponad 0,2 zależnie od reprezentacji (OCSVM na WDBC: 0,65
   w autoenkoderze, 0,93 w PCA; LOF na Cardio: 0,24 w UMAP, 0,58 w PCA).
   \item \textbf{PCA jest najlepszą reprezentacją}: średnio PR-AUC 0,617 wobec
-  0,544 w danych oryginalnych, przy koszcie kilku milisekund. Najbardziej
-  zyskują LOF i OCSVM (WDBC: 0,71 $\rightarrow$ 0,92).
+  0,544 w danych oryginalnych, przy koszcie kilku milisekund. Zysk pochodzi
+  głównie z WDBC (LOF i OCSVM: 0,71 $\rightarrow$ 0,92, lepiej w 23 z 30
+  podziałów) i Cardio (0,60 $\rightarrow$ 0,66); na Arrhythmii i Campaign
+  zmiana mieści się w 0,01.
   \item \textbf{Liczby składowych nie wybierać według zachowanej
   wariancji}: na WDBC 33\,\% wariancji daje lepszy wynik niż 100\,\%,
-  a na Arrhythmii optimum to 32--47\,\%.
+  a na Arrhythmii wynik przestaje rosnąć już przy 32\,\% (5 składowych).
   \item \textbf{UMAP zwykle szkodzi}, bo wyrównuje gęstość (pogorszenie w 10
   z 12 par), ale z OCSVM może oddzielić spójną grupę anomalii (Cardio: 0,84
   -- najlepszy wynik na tym zbiorze). Używać go głównie do rysunków, a do
   detekcji tylko z OCSVM i wyborem na walidacji.
-  \item \textbf{Autoenkoder nie uzasadnia swojego kosztu} na tych danych
-  (tysiące razy wolniejszy od PCA), poza Arrhythmią, gdzie cech jest więcej
-  niż obserwacji.
-  \item \textbf{Ładny obraz 2D nie oznacza dobrej detekcji}, a separacja
-  klas zgadza się z jakością tylko na dwóch zbiorach z czterech.
+  \item \textbf{Autoenkoder nie uzasadnia swojego kosztu}: jest tysiące razy
+  wolniejszy od PCA i na żadnym zbiorze danych nie daje lepszego wyniku.
+  Nawet na Arrhythmii, gdzie cech jest więcej niż obserwacji, osiąga tyle samo
+  co PCA i IForest w danych oryginalnych (0,58--0,60).
+  \item \textbf{Ładny obraz 2D nie oznacza dobrej detekcji}: UMAP daje
+  najczytelniejsze obrazy Campaign i Arrhythmii, a na obu jest najsłabszą
+  reprezentacją (PR-AUC 0,23 i 0,36). Separacja klas zgadza się z jakością
+  tylko na dwóch zbiorach z czterech ($r=0{,}95$ na Arrhythmii i 0,89 na
+  WDBC, ale 0,28 na Campaign i $-0{,}22$ na Cardio).
   \item \textbf{Gdy anomalie nie odstają od danych (Campaign), żadna
   reprezentacja nie pomaga} (PR-AUC najwyżej 0,30). Żadna para
   reprezentacja--detektor nie jest najlepsza wszędzie -- to przesłanka do

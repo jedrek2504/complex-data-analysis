@@ -1,0 +1,10 @@
+\begin{tabular}{llccc}
+\toprule
+Zbiór danych & Detektor & \makecell[r]{ROC-AUC detektora\\dla anomalii globalnych} & \makecell[r]{Dalej od sąsiadów niż\\obserwacja normalna [\%]} & \makecell[r]{Dalej od środka danych niż\\obserwacja normalna [\%]} \\
+\midrule
+Cardio & OCSVM & 0,98 $\rightarrow$ 0,98 & 94 $\rightarrow$ 45 & 99 $\rightarrow$ 98 \\
+Arrhythmia & IForest / LOF & 0,95 $\rightarrow$ 0,83 & 93 $\rightarrow$ 57 & 93 $\rightarrow$ 62 \\
+WDBC & LOF / OCSVM & 1,00 $\rightarrow$ 0,98 & 100 $\rightarrow$ 71 & 100 $\rightarrow$ 97 \\
+Campaign & IForest & 0,94 $\rightarrow$ 0,85 & 98 $\rightarrow$ 38 & 99 $\rightarrow$ 86 \\
+\bottomrule
+\end{tabular}
